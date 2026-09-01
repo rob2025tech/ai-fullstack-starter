@@ -33,7 +33,7 @@ docs/architecture/      # ADRs
 | Monorepo skeleton + ADRs | Done |
 | `packages/api-contract` (OpenAPI + codegen + conformance) | Done |
 | `backends/fastapi` (health + chat + SSE + mock provider) | Done |
-| `apps/web` | Not started |
+| `apps/web` | Done |
 | `apps/mobile` | Not started |
 
 See `docs/architecture/` for the decisions (ADR-001 onward) and

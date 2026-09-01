@@ -4,6 +4,7 @@ dist/
 .next/
 out/
 *.tsbuildinfo
+next-env.d.ts
 
 # Expo / React Native
 .expo/
