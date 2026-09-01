@@ -22,9 +22,10 @@ either client.
 
 ## Repository Status
 
-Skeleton as of 2026-08-31: directory layout, root docs, and ADRs only.
-Contract package, backends, and clients land stepwise; check the status
-table in `README.md` before assuming a package exists.
+Day-1 vertical slice complete as of 2026-08-31: contract package,
+FastAPI reference backend, Next.js web client, and Expo mobile client.
+Check the status table in `README.md` before assuming any additional
+package exists.
 
 ## Repository Structure
 
@@ -97,5 +98,8 @@ docs/architecture/      # ADRs (ADR-001 onward)
    changes relative to older training data. Once dependencies are
    installed, read the relevant guides in `node_modules/next/dist/docs/`
    before writing Next.js code, and heed deprecation notices.
-5. Run the relevant test subset while working and report actual
+5. In `apps/mobile`: the client deliberately consumes the contract's
+   JSON mode (ADR-006). Do not add SSE polyfills or a streaming
+   transport without revisiting that ADR.
+6. Run the relevant test subset while working and report actual
    passed/skipped counts — never assume a fixed baseline.

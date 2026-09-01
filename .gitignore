@@ -9,6 +9,9 @@ next-env.d.ts
 # Expo / React Native
 .expo/
 expo-env.d.ts
+# Generated native projects (regenerate with `npx expo prebuild`)
+apps/mobile/ios/
+apps/mobile/android/
 
 # Python
 .venv/

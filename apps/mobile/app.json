@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "AI Fullstack Starter",
+    "slug": "ai-fullstack-starter-mobile",
+    "version": "1.0.0",
+    "platforms": ["ios", "android"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rob2025tech.ai-fullstack-starter-mobile"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    }
+  }
+}

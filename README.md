@@ -34,7 +34,7 @@ docs/architecture/      # ADRs
 | `packages/api-contract` (OpenAPI + codegen + conformance) | Done |
 | `backends/fastapi` (health + chat + SSE + mock provider) | Done |
 | `apps/web` | Done |
-| `apps/mobile` | Not started |
+| `apps/mobile` | Done |
 
 See `docs/architecture/` for the decisions (ADR-001 onward) and
 `AGENTS.md` for working instructions.

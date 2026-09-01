@@ -1,0 +1,25 @@
+{
+  "name": "@ai-fullstack-starter/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "export": "expo export"
+  },
+  "dependencies": {
+    "@ai-fullstack-starter/api-contract": "*",
+    "expo": "~57.0.18",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.4",
+    "typescript": "~6.0.3",
+    "vitest": "^4"
+  }
+}
