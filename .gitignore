@@ -1,0 +1,31 @@
+# Node
+node_modules/
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# Expo / React Native
+.expo/
+expo-env.d.ts
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Generated contract artifacts (regenerate, never hand-edit)
+packages/api-contract/src/generated/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
