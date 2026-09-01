@@ -50,7 +50,8 @@ docs/architecture/      # ADRs (ADR-001 onward)
 ## Tooling
 
 - Node 24 (`.node-version`), npm workspaces; no Turborepo (ADR-005).
-- Python 3.12 per backend, each with its own venv.
+- Python 3.13 per backend (requires-python >= 3.12), each with its own
+  venv and a pinned `requirements-lock.txt`.
 
 ## Reference Repositories (READ-ONLY)
 

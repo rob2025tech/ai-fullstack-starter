@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm ci
+      - run: npm run generate -w @ai-fullstack-starter/api-contract
+      - run: npm test -w @ai-fullstack-starter/api-contract
+      - run: npm run typecheck -w @ai-fullstack-starter/api-contract
+
+  fastapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: python -m venv backends/fastapi/.venv
+      - run: backends/fastapi/.venv/bin/pip install -r backends/fastapi/requirements-lock.txt
+      - run: backends/fastapi/.venv/bin/ruff check backends/fastapi
+      - run: backends/fastapi/.venv/bin/pytest
+        working-directory: backends/fastapi
+      - run: npm ci
+      - name: Run contract conformance against the live backend
+        run: |
+          cd backends/fastapi
+          .venv/bin/uvicorn app.main:app --port 8000 &
+          SERVER_PID=$!
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null && break
+            sleep 1
+          done
+          cd "$GITHUB_WORKSPACE"
+          CONTRACT_BASE_URL=http://127.0.0.1:8000 npm run test:conformance -w @ai-fullstack-starter/api-contract
+          STATUS=$?
+          kill "$SERVER_PID"
+          exit $STATUS
