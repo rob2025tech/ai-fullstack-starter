@@ -1,0 +1,226 @@
+openapi: 3.1.0
+info:
+  title: AI Fullstack Starter API
+  version: 1.0.0
+  description: |
+    Versioned, language-neutral API contract shared by all clients
+    (web, mobile) and implemented by every backend (FastAPI reference
+    today; Node/Express or others later).
+
+    Rules (docs/architecture/ADR-001..ADR-004):
+    - This file is the sole source of truth for the API boundary.
+      Changes are additive-only within v1; breaking changes require
+      /api/v2 plus an ADR.
+    - Nothing language-specific crosses the boundary: errors use the
+      Error code registry, never exception class names or framework
+      shapes.
+    - v1 has no authentication; user_id is an anonymous client-supplied
+      scope, not an identity.
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local development
+tags:
+  - name: health
+    description: Liveness probes
+  - name: chat
+    description: Prompt in, completion out
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    version: "1.0.0"
+  /api/v1/chat:
+    post:
+      operationId: createChat
+      tags: [chat]
+      summary: Send a prompt; receive a completion (JSON or SSE stream)
+      description: |
+        With `stream: false` (default) responds with a single JSON
+        ChatResponse.
+
+        With `stream: true` responds with `text/event-stream` (ADR-003):
+        one or more `delta` events carrying content fragments, then
+        exactly one terminal event — `message` carrying the full
+        ChatResponse on success, or `error` carrying an ErrorResponse
+        on failure. The stream always closes after the terminal event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+            examples:
+              jsonMode:
+                value:
+                  prompt: "Explain API contracts in one sentence."
+                  user_id: anonymous
+              streamMode:
+                value:
+                  prompt: "Explain API contracts in one sentence."
+                  stream: true
+      responses:
+        "200":
+          description: Completion (JSON mode) or SSE stream (stream mode).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE event stream; every event payload is JSON.
+                  - event `delta`: SseDeltaEvent
+                  - event `message`: ChatResponse (terminal, success)
+                  - event `error`: ErrorResponse (terminal, failure)
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "502":
+          $ref: "#/components/responses/ProviderError"
+        "503":
+          $ref: "#/components/responses/ProviderUnavailable"
+components:
+  responses:
+    InvalidRequest:
+      description: Request failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            emptyPrompt:
+              value:
+                error:
+                  code: invalid_request
+                  message: "prompt must be a non-empty string"
+    RateLimited:
+      description: Too many requests; retry later.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Unexpected server-side failure.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ProviderError:
+      description: The AI provider returned an error or malformed output.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ProviderUnavailable:
+      description: The requested AI provider is not configured or unreachable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+          description: Optional implementation or contract version.
+    ChatRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+        user_id:
+          type: [string, "null"]
+          description: |
+            Anonymous scoping value (ADR-004), not an identity.
+            Servers default to "anonymous" when absent.
+        stream:
+          type: boolean
+          default: false
+          description: When true, respond with an SSE event stream.
+    ChatMessage:
+      type: object
+      required: [id, role, content, finish_reason]
+      properties:
+        id:
+          type: string
+        role:
+          const: assistant
+        content:
+          type: string
+        finish_reason:
+          type: string
+          enum: [stop, length]
+    Usage:
+      type: [object, "null"]
+      description: Token accounting when the implementation provides it.
+      properties:
+        input_tokens:
+          type: [integer, "null"]
+          minimum: 0
+        output_tokens:
+          type: [integer, "null"]
+          minimum: 0
+    ChatResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          $ref: "#/components/schemas/ChatMessage"
+        usage:
+          $ref: "#/components/schemas/Usage"
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable, language-neutral error code registry.
+          enum:
+            - invalid_request
+            - rate_limited
+            - provider_error
+            - provider_unavailable
+            - internal_error
+        message:
+          type: string
+          description: Human-readable explanation, safe to display.
+        details:
+          type: object
+          description: Optional structured context; additive only.
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+    SseDeltaEvent:
+      type: object
+      required: [content]
+      description: Payload of an SSE `delta` event in stream mode.
+      properties:
+        content:
+          type: string

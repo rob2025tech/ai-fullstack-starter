@@ -31,7 +31,7 @@ docs/architecture/      # ADRs
 | Piece | Status |
 |---|---|
 | Monorepo skeleton + ADRs | Done |
-| `packages/api-contract` (OpenAPI + codegen + conformance) | Not started |
+| `packages/api-contract` (OpenAPI + codegen + conformance) | Done |
 | `backends/fastapi` (health + chat + SSE + mock provider) | Not started |
 | `apps/web` | Not started |
 | `apps/mobile` | Not started |

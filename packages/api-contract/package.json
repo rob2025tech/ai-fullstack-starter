@@ -1,0 +1,19 @@
+{
+  "name": "@ai-fullstack-starter/api-contract",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript openapi.yaml -o src/generated/schema.ts",
+    "test": "vitest run tests",
+    "test:conformance": "vitest run conformance",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "yaml": "^2.9.0"
+  }
+}
