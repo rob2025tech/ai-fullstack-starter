@@ -1,33 +1,387 @@
 # Mobile client (Expo)
 
 Single-screen chat UI consuming the `/api/v1` contract via types from
-`packages/api-contract`. No secrets live here — only the backend base
-URL (`EXPO_PUBLIC_API_BASE_URL`, default `http://127.0.0.1:8000`).
+`packages/api-contract`.
 
-## Run
+The recommended development workflow uses the Mac's **LAN IP** for both
+Expo/Metro and the FastAPI backend. This works for both a **physical iPhone**
+and the **iPhone Simulator**.
 
-```bash
-# from the repo root; backend must be running (see backends/fastapi)
-npm run start -w @ai-fullstack-starter/mobile   # Metro dev server
-```
+## Prerequisites
 
-Native directories are generated, not committed. To run on a
-simulator/emulator use the native workflow (generates `ios/` or
-`android/` on first run):
+From the repository root:
 
 ```bash
-npm run ios -w @ai-fullstack-starter/mobile     # expo run:ios
-npm run android -w @ai-fullstack-starter/mobile # expo run:android
+nvm use 24
+npm ci
 ```
 
-Alternatively, scan the QR code from `expo start` with Expo Go if the
-installed SDK is still supported there.
+You also need:
 
-Note: `http://127.0.0.1` only works from a simulator on the same
-machine. A physical device needs the machine's LAN IP in
-`EXPO_PUBLIC_API_BASE_URL` (copy `.env.example` to `.env`).
+* Xcode and the iOS Simulator for simulator development
+* Expo Go on a physical iPhone
+* A compatible Expo Go 57 build in the iOS Simulator
+* The FastAPI backend running on port `8000`
 
-## Scripts
+## 1. Configure the backend URL
+
+Create the mobile environment file:
+
+```bash
+cp apps/mobile/.env.example apps/mobile/.env
+```
+
+Set the Mac's LAN IP:
+
+```text
+EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8000
+```
+
+For example:
+
+```text
+EXPO_PUBLIC_API_BASE_URL=http://192.168.0.34:8000
+```
+
+Do **not** use `127.0.0.1` for the normal physical-device/Simulator
+workflow.
+
+`EXPO_PUBLIC_*` values are bundled when Expo starts, so restart Expo after
+changing `.env`.
+
+### Find the Mac's LAN IP
+
+On this Mac, try:
+
+```bash
+ipconfig getifaddr en0
+```
+
+If that does not return an address, check:
+
+**System Settings → Network**
+
+If the Mac's LAN IP changes, update `apps/mobile/.env` and restart Expo.
+
+---
+
+## 2. Start FastAPI
+
+From the repository root:
+
+```bash
+cd backends/fastapi
+.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The `0.0.0.0` binding is important: physical devices and the LAN-based
+Simulator must be able to reach the Mac.
+
+Verify the backend locally:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/health
+```
+
+Expected:
+
+```json
+{"status":"ok","version":"1.0.0"}
+```
+
+---
+
+## 3. Start Expo/Metro
+
+From the repository root:
+
+```bash
+nvm use 24
+npm run start --workspace=@ai-fullstack-starter/mobile -- --host lan
+```
+
+Use the normal Metro port, **8081**.
+
+Expo should advertise a URL similar to:
+
+```text
+exp://192.168.0.34:8081
+```
+
+Leave this terminal running.
+
+### Permanent development rule
+
+**Use Expo LAN mode on port `8081` and the Mac's LAN IP.**
+
+Do not normally start a second Metro server on `8082` or another temporary
+port.
+
+---
+
+# Physical iPhone
+
+This is the normal workflow for a real iPhone.
+
+### 1. Connect the iPhone and Mac to the same network
+
+The iPhone must be able to reach the Mac over the LAN.
+
+### 2. Start FastAPI
+
+```bash
+cd backends/fastapi
+.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### 3. Start Expo in LAN mode
+
+From the repository root:
+
+```bash
+npm run start --workspace=@ai-fullstack-starter/mobile -- --host lan
+```
+
+### 4. Open Expo Go on the iPhone
+
+Scan the QR code displayed by Expo.
+
+The connection is:
+
+```text
+Physical iPhone
+      │
+      ├── Expo/Metro ──> Mac LAN IP :8081
+      │
+      └── FastAPI ─────> Mac LAN IP :8000
+```
+
+No `xcrun simctl` command is needed for a physical iPhone.
+
+---
+
+# iPhone Simulator
+
+The iPhone Simulator uses the same LAN-based Expo workflow.
+
+### 1. Boot the Simulator
+
+```bash
+open -a Simulator
+```
+
+Or boot a specific simulator through Xcode or `simctl`.
+
+### 2. Start FastAPI
+
+```bash
+cd backends/fastapi
+.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### 3. Start Expo in LAN mode
+
+From the repository root:
+
+```bash
+nvm use 24
+npm run start --workspace=@ai-fullstack-starter/mobile -- --host lan
+```
+
+### 4. Open the project in Expo Go
+
+Use the Mac's current LAN IP:
+
+```bash
+xcrun simctl openurl booted 'exp://<MAC-LAN-IP>:8081'
+```
+
+For example:
+
+```bash
+xcrun simctl openurl booted 'exp://192.168.0.34:8081'
+```
+
+This opens the project in Expo Go.
+
+The connection is:
+
+```text
+iPhone Simulator
+      │
+      │ exp://192.168.0.34:8081
+      ▼
+     Mac
+      │
+      ├── Expo/Metro :8081
+      │
+      └── FastAPI     :8000
+```
+
+---
+
+# Why LAN mode is the standard workflow
+
+Expo's `--localhost` mode caused problems in this development environment.
+
+During debugging, Metro under `--localhost` listened on IPv6 loopback:
+
+```text
+[::1]:8081
+```
+
+while Expo Go was given bundle URLs involving:
+
+```text
+127.0.0.1:8081
+```
+
+The resulting behavior was inconsistent:
+
+* `localhost` could reach Metro in some contexts.
+* `[::1]` could reach Metro from Simulator Safari.
+* `127.0.0.1` could not reach that Metro listener.
+* Expo Go could not reliably load the project using the localhost URLs.
+* Opening the IPv6 Expo URL caused Expo Go to crash in its network-interceptor
+  code before the application JavaScript ran.
+
+The LAN workflow avoids this localhost/IPv4/IPv6 ambiguity.
+
+Therefore, use:
+
+```bash
+npm run start --workspace=@ai-fullstack-starter/mobile -- --host lan
+```
+
+and:
+
+```text
+exp://<MAC-LAN-IP>:8081
+```
+
+Do **not** use these as the normal workflow:
+
+```bash
+npm run start --workspace=@ai-fullstack-starter/mobile -- --localhost
+```
+
+```text
+exp://127.0.0.1:8081
+```
+
+```text
+exp://[::1]:8081
+```
+
+---
+
+# Troubleshooting
+
+## Check whether Metro is running
+
+```bash
+lsof -nP -iTCP:8081 -sTCP:LISTEN
+```
+
+Normally there should be one Metro/Node process listening on `8081`.
+
+You can also verify Metro directly from the Mac:
+
+```bash
+curl http://<MAC-LAN-IP>:8081
+```
+
+A JSON Expo manifest indicates that Metro is responding.
+
+## Check the backend
+
+```bash
+curl http://127.0.0.1:8000/api/v1/health
+```
+
+If the backend is running but devices cannot connect, make sure it was started
+with:
+
+```bash
+--host 0.0.0.0
+```
+
+rather than only:
+
+```bash
+--host 127.0.0.1
+```
+
+## Check for a leftover temporary Metro server
+
+If you previously used another port:
+
+```bash
+lsof -nP -iTCP:8082 -sTCP:LISTEN
+```
+
+A normal clean setup should not need anything on `8082`.
+
+If an old temporary Metro process is still running, stop it before restarting
+the normal `8081` workflow.
+
+## Restart after changing `.env`
+
+Because `EXPO_PUBLIC_API_BASE_URL` is bundled into the app, changing `.env`
+requires restarting Expo.
+
+Stop Metro with `Ctrl-C`, then run:
+
+```bash
+npm run start --workspace=@ai-fullstack-starter/mobile -- --host lan
+```
+
+## Simulator cannot open the project
+
+Make sure:
+
+1. The Simulator is booted.
+2. FastAPI is running on `0.0.0.0:8000`.
+3. Metro is running in LAN mode on `8081`.
+4. `.env` contains the Mac's current LAN IP.
+5. The URL uses the Mac's LAN IP rather than `127.0.0.1` or `[::1]`.
+
+Then run:
+
+```bash
+xcrun simctl openurl booted 'exp://<MAC-LAN-IP>:8081'
+```
+
+If Expo Go itself is malfunctioning, reinstall a Simulator Expo Go build
+compatible with SDK 57 rather than assuming the currently installed build is
+correct.
+
+---
+
+# Native workflows
+
+Native directories are generated and are not committed.
+
+For a native iOS build:
+
+```bash
+npm run ios -w @ai-fullstack-starter/mobile
+```
+
+For Android:
+
+```bash
+npm run android -w @ai-fullstack-starter/mobile
+```
+
+These are separate from the normal Expo Go development workflow.
+
+For ordinary JavaScript/UI development, use Expo Go with the LAN workflow
+documented above.
+
+---
+
+# Scripts
 
 ```bash
 npm test             # vitest (contract client)
@@ -35,14 +389,48 @@ npm run typecheck    # tsc --noEmit
 npm run export       # expo export (headless bundle check)
 ```
 
-## Notes
+---
 
-- Day-1 uses the contract's **JSON mode** (`stream: false`): React
-  Native fetch streaming is inconsistent across platforms, and the
-  non-streaming response is the same `ChatResponse` shape the SSE
-  terminal `message` event carries. Switching to SSE later is additive
-  — no contract change needed (ADR-003).
-- Contract types come from `@ai-fullstack-starter/api-contract`; run
-  `npm run generate -w @ai-fullstack-starter/api-contract` after any
-  spec change. `metro.config.js` watches the repo root so the workspace
-  package is bundled directly from source.
+# Architecture notes
+
+* Day-1 uses the contract's **JSON mode** (`stream: false`): React Native
+  fetch streaming is inconsistent across platforms, and the non-streaming
+  response is the same `ChatResponse` shape the SSE terminal `message` event
+  carries. Switching to SSE later is additive — no contract change needed
+  (ADR-003).
+* Contract types come from `@ai-fullstack-starter/api-contract`.
+* After a spec change, regenerate the contract:
+
+```bash
+npm run generate -w @ai-fullstack-starter/api-contract
+```
+
+* `metro.config.js` watches the repository root so the workspace package is
+  bundled directly from source.
+
+---
+
+# Quick reference
+
+## Physical iPhone
+
+```text
+1. Mac + iPhone on same LAN
+2. apps/mobile/.env → EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8000
+3. FastAPI → 0.0.0.0:8000
+4. Expo → --host lan → :8081
+5. Scan Expo QR code with Expo Go
+```
+
+## iPhone Simulator
+
+```text
+1. Boot Simulator
+2. apps/mobile/.env → EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8000
+3. FastAPI → 0.0.0.0:8000
+4. Expo → --host lan → :8081
+5. xcrun simctl openurl booted 'exp://<MAC-LAN-IP>:8081'
+```
+
+**Permanent rule:** Expo LAN + port `8081` + Mac LAN IP for both physical
+iPhone and iPhone Simulator.
