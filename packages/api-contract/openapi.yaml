@@ -24,6 +24,8 @@ tags:
     description: Liveness probes
   - name: chat
     description: Prompt in, completion out
+  - name: learning
+    description: Adaptive learning state and answer evaluation
 paths:
   /api/v1/health:
     get:
@@ -42,6 +44,7 @@ paths:
                   value:
                     status: ok
                     version: "1.0.0"
+
   /api/v1/chat:
     post:
       operationId: createChat
@@ -96,6 +99,60 @@ paths:
           $ref: "#/components/responses/ProviderError"
         "503":
           $ref: "#/components/responses/ProviderUnavailable"
+
+  /api/v1/learning/state:
+    get:
+      operationId: getLearningState
+      tags: [learning]
+      summary: Get learning state for a concept
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: concept
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Current learning state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningStateResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/answer:
+    post:
+      operationId: answerLearningQuestion
+      tags: [learning]
+      summary: Evaluate an answer and update learning state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearningAnswerRequest"
+      responses:
+        "200":
+          description: Answer evaluation and updated learning state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningAnswerResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   responses:
     InvalidRequest:
@@ -110,30 +167,35 @@ components:
                 error:
                   code: invalid_request
                   message: "prompt must be a non-empty string"
+
     RateLimited:
       description: Too many requests; retry later.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
     InternalError:
       description: Unexpected server-side failure.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
     ProviderError:
       description: The AI provider returned an error or malformed output.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
     ProviderUnavailable:
       description: The requested AI provider is not configured or unreachable.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthResponse:
       type: object
@@ -145,6 +207,7 @@ components:
         version:
           type: string
           description: Optional implementation or contract version.
+
     ChatRequest:
       type: object
       required: [prompt]
@@ -161,6 +224,7 @@ components:
           type: boolean
           default: false
           description: When true, respond with an SSE event stream.
+
     ChatMessage:
       type: object
       required: [id, role, content, finish_reason]
@@ -174,6 +238,7 @@ components:
         finish_reason:
           type: string
           enum: [stop, length]
+
     Usage:
       type: [object, "null"]
       description: Token accounting when the implementation provides it.
@@ -184,6 +249,7 @@ components:
         output_tokens:
           type: [integer, "null"]
           minimum: 0
+
     ChatResponse:
       type: object
       required: [message]
@@ -192,6 +258,91 @@ components:
           $ref: "#/components/schemas/ChatMessage"
         usage:
           $ref: "#/components/schemas/Usage"
+
+    LearningStateResponse:
+      type: object
+      required:
+        - user_id
+        - concept
+        - mastery
+        - attempts
+        - correct_count
+      properties:
+        user_id:
+          type: string
+        concept:
+          type: string
+        mastery:
+          type: number
+          minimum: 0
+          maximum: 1
+        attempts:
+          type: integer
+          minimum: 0
+        correct_count:
+          type: integer
+          minimum: 0
+        last_misconception:
+          type: [string, "null"]
+        next_review_at:
+          type: [string, "null"]
+          format: date-time
+
+    LearningAnswerRequest:
+      type: object
+      required:
+        - user_id
+        - concept
+        - answer
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+        concept:
+          type: string
+          minLength: 1
+        answer:
+          type: string
+          minLength: 1
+
+    LearningAnswerResponse:
+      type: object
+      required:
+        - user_id
+        - concept
+        - is_correct
+        - mastery_before
+        - mastery_after
+        - attempts
+        - correct_count
+        - next_review_at
+      properties:
+        user_id:
+          type: string
+        concept:
+          type: string
+        is_correct:
+          type: boolean
+        misconception:
+          type: [string, "null"]
+        mastery_before:
+          type: number
+          minimum: 0
+          maximum: 1
+        mastery_after:
+          type: number
+          minimum: 0
+          maximum: 1
+        attempts:
+          type: integer
+          minimum: 0
+        correct_count:
+          type: integer
+          minimum: 0
+        next_review_at:
+          type: string
+          format: date-time
+
     Error:
       type: object
       required: [code, message]
@@ -211,12 +362,14 @@ components:
         details:
           type: object
           description: Optional structured context; additive only.
+
     ErrorResponse:
       type: object
       required: [error]
       properties:
         error:
           $ref: "#/components/schemas/Error"
+
     SseDeltaEvent:
       type: object
       required: [content]

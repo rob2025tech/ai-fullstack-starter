@@ -5,10 +5,12 @@ from fastapi.responses import JSONResponse
 
 from app.config.settings import Settings, settings
 from app.core.errors import BackendError
+from app.learning.repository import InMemoryLearningRepository
 from app.models.error_models import Error, ErrorResponse
 from app.providers.llm.registry import build_llm_provider
-from app.routers import chat, health
+from app.routers import chat, health, learning
 from app.services.chat_service import ChatService
+from app.learning.service import LearningService
 
 
 def _error_body(code: str, message: str) -> dict:
@@ -30,8 +32,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.state.chat_service = ChatService(build_llm_provider(app_settings))
+    app.state.learning_service = LearningService(InMemoryLearningRepository())
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(learning.router)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
