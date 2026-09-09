@@ -38,6 +38,38 @@ export async function getHealth(): Promise<void> {
   }
 }
 
+type LearningAnswerRequest =
+  components["schemas"]["LearningAnswerRequest"];
+type LearningAnswerResponse =
+  components["schemas"]["LearningAnswerResponse"];
+
+export async function answerLearningQuestion(
+  request: LearningAnswerRequest,
+): Promise<LearningAnswerResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${BASE_URL}/api/v1/learning/answer`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw new ContractError(
+      "provider_unavailable",
+      "cannot reach the backend",
+    );
+  }
+
+  if (!response.ok) {
+    throw await errorFromResponse(response);
+  }
+
+  return (await response.json()) as LearningAnswerResponse;
+}
+
+
+
 export interface StreamHandlers {
   onDelta: (content: string) => void;
   onMessage: (response: ChatResponse) => void;
