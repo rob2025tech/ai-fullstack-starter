@@ -30,6 +30,16 @@ def test_answer_updates_misconception_and_mastery():
     assert result.state.last_misconception == result.misconception
     assert result.state.next_review_at == now + timedelta(days=1)
 
+    assert result.teaching is not None
+    assert "因为 means because" in result.teaching.explanation
+    assert result.teaching.practice_question == (
+        "Which meaning best matches 虽然?"
+    )
+    assert result.teaching.choices == (
+        "although / even though",
+        "because",
+    )
+
 
 def test_correct_answer_after_misconception_improves_mastery():
     repository = InMemoryLearningRepository()
@@ -51,6 +61,7 @@ def test_correct_answer_after_misconception_improves_mastery():
     )
 
     assert result.is_correct is True
+    assert result.misconception is None
     assert result.mastery_before == 0.27
     assert result.mastery_after == pytest.approx(0.47)
 
@@ -59,6 +70,14 @@ def test_correct_answer_after_misconception_improves_mastery():
     assert result.state.last_misconception is None
     assert result.state.next_review_at == (
         now + timedelta(days=1) + timedelta(days=3)
+    )
+
+    assert result.teaching is not None
+    assert "although / even though" in result.teaching.explanation
+    assert "因为" not in result.teaching.explanation
+    assert result.teaching.choices == (
+        "although / even though",
+        "because",
     )
 
 
