@@ -19,6 +19,12 @@ class LearningAnswerRequest(BaseModel):
     answer: str = Field(min_length=1)
 
 
+class TeachingResponse(BaseModel):
+    explanation: str
+    practice_question: str
+    choices: list[str]
+
+
 class LearningAnswerResponse(BaseModel):
     user_id: str
     concept: str
@@ -29,3 +35,4 @@ class LearningAnswerResponse(BaseModel):
     attempts: int
     correct_count: int
     next_review_at: datetime
+    teaching: TeachingResponse | None = None

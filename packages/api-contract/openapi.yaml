@@ -305,6 +305,22 @@ components:
           type: string
           minLength: 1
 
+    TeachingResponse:
+      type: object
+      required:
+        - explanation
+        - practice_question
+        - choices
+      properties:
+        explanation:
+          type: string
+        practice_question:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+
     LearningAnswerResponse:
       type: object
       required:
@@ -342,6 +358,8 @@ components:
         next_review_at:
           type: string
           format: date-time
+        teaching:
+          $ref: "#/components/schemas/TeachingResponse"
 
     Error:
       type: object

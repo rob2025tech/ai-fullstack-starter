@@ -2,13 +2,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from app.learning.service import LearningService
 from app.models.error_models import ErrorResponse
 from app.models.learning_models import (
     LearningAnswerRequest,
     LearningAnswerResponse,
     LearningStateResponse,
+    TeachingResponse,
 )
-from app.learning.service import LearningService
 
 router = APIRouter(prefix="/api/v1/learning", tags=["learning"])
 
@@ -61,6 +62,16 @@ async def answer_learning_question(
         now=datetime.now(timezone.utc),
     )
 
+    teaching = (
+        TeachingResponse(
+            explanation=result.teaching.explanation,
+            practice_question=result.teaching.practice_question,
+            choices=list(result.teaching.choices),
+        )
+        if result.teaching is not None
+        else None
+    )
+
     return LearningAnswerResponse(
         user_id=result.state.user_id,
         concept=result.state.concept,
@@ -71,4 +82,5 @@ async def answer_learning_question(
         attempts=result.state.attempts,
         correct_count=result.state.correct_count,
         next_review_at=result.state.next_review_at,
+        teaching=teaching,
     )
