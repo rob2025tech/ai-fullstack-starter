@@ -57,7 +57,8 @@ async def test_openai_http_error_maps_to_provider_error():
 
 
 async def test_openai_malformed_output_maps_to_provider_error():
-    provider = _make_provider(lambda request: httpx.Response(200, json={"choices": []}))
+    provider = _make_provider(
+        lambda request: httpx.Response(200, json={"choices": []}))
     with pytest.raises(ProviderError):
         await provider.generate("hi")
 
@@ -71,13 +72,21 @@ async def test_openai_connection_error_maps_to_unavailable():
         await provider.generate("hi")
 
 
+# def test_registry_defaults_to_mock():
+#     assert isinstance(build_llm_provider(Settings()), MockLLMProvider)
+
 def test_registry_defaults_to_mock():
-    assert isinstance(build_llm_provider(Settings()), MockLLMProvider)
+    assert isinstance(build_llm_provider(
+        Settings(_env_file=None)), MockLLMProvider)
 
 
 def test_registry_openai_requires_api_key():
     with pytest.raises(ProviderUnavailableError):
-        build_llm_provider(Settings(llm_provider="openai"))
+        build_llm_provider(Settings(_env_file=None, llm_provider="openai"))
+
+# def test_registry_openai_requires_api_key():
+#     with pytest.raises(ProviderUnavailableError):
+#         build_llm_provider(Settings(llm_provider="openai"))
 
 
 def test_registry_rejects_unknown_provider():
