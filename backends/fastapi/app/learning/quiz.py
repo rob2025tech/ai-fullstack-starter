@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-BloomLevel = Literal["remember", "understand", "apply"]
+BloomLevel = Literal[
+    "remember", "understand", "apply", "analyze", "evaluate", "create"
+]
 
 
 @dataclass(frozen=True)
