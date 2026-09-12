@@ -152,7 +152,52 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/v1/learning/quiz:
+    get:
+      operationId: getLearningQuiz
+      tags: [learning]
+      summary: Get a retention quiz question
+      parameters:
+        - name: concept
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Quiz question.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningQuizResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
+  /api/v1/learning/quiz/answer:
+    post:
+      operationId: answerLearningQuiz
+      tags: [learning]
+      summary: Evaluate a retention quiz answer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearningQuizAnswerRequest"
+      responses:
+        "200":
+          description: Quiz result and updated learning state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningQuizAnswerResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   responses:
     InvalidRequest:
@@ -360,7 +405,85 @@ components:
           format: date-time
         teaching:
           $ref: "#/components/schemas/TeachingResponse"
+    LearningQuizResponse:
+      type: object
+      required:
+        - concept
+        - question
+        - choices
+        - bloom_level
+      properties:
+        concept:
+          type: string
+        question:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        #   type: string
+        bloom_level:
+          type: string
+          enum:
+            - remember
+            - understand
+            - apply
+            - analyze
+            - evaluate
+            - create
 
+    LearningQuizAnswerRequest:
+      type: object
+      required:
+        - user_id
+        - concept
+        - selected_answer
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+        concept:
+          type: string
+          minLength: 1
+        selected_answer:
+          type: string
+          minLength: 1
+
+    LearningQuizAnswerResponse:
+      type: object
+      required:
+        - user_id
+        - concept
+        - is_correct
+        - mastery_before
+        - mastery_after
+        - attempts
+        - correct_count
+        - next_review_at
+      properties:
+        user_id:
+          type: string
+        concept:
+          type: string
+        is_correct:
+          type: boolean
+        mastery_before:
+          type: number
+          minimum: 0
+          maximum: 1
+        mastery_after:
+          type: number
+          minimum: 0
+          maximum: 1
+        attempts:
+          type: integer
+          minimum: 0
+        correct_count:
+          type: integer
+          minimum: 0
+        next_review_at:
+          type: string
+          format: date-time
     Error:
       type: object
       required: [code, message]

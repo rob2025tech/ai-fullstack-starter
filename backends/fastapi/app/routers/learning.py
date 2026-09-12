@@ -2,11 +2,17 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from app.core.errors import InvalidRequestError
+from app.learning.quiz import evaluate_answer
+from app.learning.quiz_content import get_quiz_question
 from app.learning.service import LearningService
 from app.models.error_models import ErrorResponse
 from app.models.learning_models import (
     LearningAnswerRequest,
     LearningAnswerResponse,
+    LearningQuizAnswerRequest,
+    LearningQuizAnswerResponse,
+    LearningQuizResponse,
     LearningStateResponse,
     TeachingResponse,
 )
@@ -83,4 +89,81 @@ async def answer_learning_question(
         correct_count=result.state.correct_count,
         next_review_at=result.state.next_review_at,
         teaching=teaching,
+    )
+
+
+@router.get(
+    "/quiz",
+    response_model=LearningQuizResponse,
+    responses={
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def get_learning_quiz(
+    concept: str,
+) -> LearningQuizResponse:
+    question = get_quiz_question(concept)
+
+    if question is None:
+        raise InvalidRequestError(
+            f"Unknown quiz concept: {concept}",
+        )
+
+    return LearningQuizResponse(
+        concept=question.concept,
+        question=question.question,
+        choices=list(question.choices),
+        bloom_level=question.bloom_level,
+    )
+
+
+@router.post(
+    "/quiz/answer",
+    response_model=LearningQuizAnswerResponse,
+    responses={
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def answer_learning_quiz(
+    request: LearningQuizAnswerRequest,
+    raw_request: Request,
+) -> LearningQuizAnswerResponse:
+    question = get_quiz_question(request.concept)
+
+    if question is None:
+        raise InvalidRequestError(
+            f"Unknown quiz concept: {request.concept}",
+        )
+
+    result = evaluate_answer(
+        question,
+        request.selected_answer,
+    )
+
+    service: LearningService = raw_request.app.state.learning_service
+
+    state_before = service.get_state(
+        request.user_id,
+        request.concept,
+    )
+
+    mastery_before = state_before.mastery
+
+    state = service.record_quiz_result(
+        request.user_id,
+        result,
+        now=datetime.now(timezone.utc),
+    )
+
+    return LearningQuizAnswerResponse(
+        user_id=state.user_id,
+        concept=state.concept,
+        is_correct=result.is_correct,
+        mastery_before=mastery_before,
+        mastery_after=state.mastery,
+        attempts=state.attempts,
+        correct_count=state.correct_count,
+        next_review_at=state.next_review_at,
     )

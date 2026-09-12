@@ -25,6 +25,30 @@ class TeachingResponse(BaseModel):
     choices: list[str]
 
 
+class LearningQuizResponse(BaseModel):
+    concept: str
+    question: str
+    choices: list[str]
+    bloom_level: str
+
+
+class LearningQuizAnswerRequest(BaseModel):
+    user_id: str = Field(min_length=1)
+    concept: str = Field(min_length=1)
+    selected_answer: str = Field(min_length=1)
+
+
+class LearningQuizAnswerResponse(BaseModel):
+    user_id: str
+    concept: str
+    is_correct: bool
+    mastery_before: float
+    mastery_after: float
+    attempts: int
+    correct_count: int
+    next_review_at: datetime
+
+
 class LearningAnswerResponse(BaseModel):
     user_id: str
     concept: str
