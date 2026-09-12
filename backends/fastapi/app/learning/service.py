@@ -8,7 +8,8 @@ from app.learning.repository import (
     LearningState,
 )
 from app.learning.scheduler import review_interval
-from app.learning.teaching import TeachingResponse, generate_teaching
+from app.learning.teaching import TeachingResponse
+from app.services.teaching_service import TeachingService
 
 
 @dataclass(frozen=True)
@@ -25,17 +26,15 @@ class LearningService:
     def __init__(
         self,
         repository: InMemoryLearningRepository,
+        teaching_service: TeachingService | None = None,
     ) -> None:
         self.repository = repository
+        self.teaching_service = teaching_service or TeachingService()
 
-    def get_state(
-        self,
-        user_id: str,
-        concept: str,
-    ) -> LearningState:
+    def get_state(self, user_id: str, concept: str) -> LearningState:
         return self.repository.get_or_create(user_id, concept)
 
-    def answer(
+    async def answer(
         self,
         user_id: str,
         concept: str,
@@ -45,6 +44,7 @@ class LearningService:
     ) -> LearningResult:
         state = self.repository.get_or_create(user_id, concept)
         diagnosis = diagnose_answer(concept, answer)
+
         mastery_before = state.mastery
         mastery_after = update_mastery(
             mastery_before,
@@ -53,6 +53,7 @@ class LearningService:
         )
 
         state.attempts += 1
+
         if diagnosis.is_correct:
             state.correct_count += 1
 
@@ -62,7 +63,7 @@ class LearningService:
 
         self.repository.save(state)
 
-        teaching = generate_teaching(
+        teaching = await self.teaching_service.generate(
             concept,
             diagnosis.misconception,
         )

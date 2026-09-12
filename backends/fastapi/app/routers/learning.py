@@ -55,7 +55,7 @@ async def answer_learning_question(
 ) -> LearningAnswerResponse:
     service: LearningService = raw_request.app.state.learning_service
 
-    result = service.answer(
+    result = await service.answer(
         request.user_id,
         request.concept,
         request.answer,

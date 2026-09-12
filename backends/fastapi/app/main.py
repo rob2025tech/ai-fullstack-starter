@@ -9,8 +9,9 @@ from app.learning.repository import InMemoryLearningRepository
 from app.models.error_models import Error, ErrorResponse
 from app.providers.llm.registry import build_llm_provider
 from app.routers import chat, health, learning
-from app.services.chat_service import ChatService
 from app.learning.service import LearningService
+from app.services.chat_service import ChatService
+from app.services.teaching_service import TeachingService
 
 
 def _error_body(code: str, message: str) -> dict:
@@ -31,8 +32,13 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
-    app.state.chat_service = ChatService(build_llm_provider(app_settings))
-    app.state.learning_service = LearningService(InMemoryLearningRepository())
+    llm_provider = build_llm_provider(app_settings)
+    app.state.chat_service = ChatService(llm_provider)
+    app.state.teaching_service = TeachingService()
+    app.state.learning_service = LearningService(
+        InMemoryLearningRepository(),
+        app.state.teaching_service,
+    )
     app.include_router(health.router)
     app.include_router(chat.router)
     app.include_router(learning.router)
