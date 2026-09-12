@@ -34,7 +34,9 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     )
     llm_provider = build_llm_provider(app_settings)
     app.state.chat_service = ChatService(llm_provider)
-    app.state.teaching_service = TeachingService()
+    app.state.teaching_service = TeachingService(
+        None if app_settings.llm_provider == "mock" else llm_provider
+    )
     app.state.learning_service = LearningService(
         InMemoryLearningRepository(),
         app.state.teaching_service,
