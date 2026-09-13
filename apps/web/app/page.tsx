@@ -10,7 +10,7 @@ export default function Home() {
         </p>
 
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Learn what you don&apos;t know.
+          Learn what you don't know.
         </h1>
 
         <p className="mt-2 max-w-2xl text-black/60">

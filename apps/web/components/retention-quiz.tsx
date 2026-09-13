@@ -457,7 +457,7 @@ export default function RetentionQuiz() {
 
                 <div>
                   <p className="font-semibold">
-                    Not quite — let&apos;s teach the concept.
+                    Not quite — let's teach the concept.
                   </p>
 
                   <p className="mt-2 text-sm leading-6 text-black/70">
@@ -556,7 +556,7 @@ export default function RetentionQuiz() {
                 >
                   <p className="font-semibold">
                     {practiceResult.is_correct
-                      ? "Practice correct — now let&apos;s retest."
+                      ? "Practice correct — now let's retest."
                       : "Still shaky — review the explanation and try again."}
                   </p>
 
