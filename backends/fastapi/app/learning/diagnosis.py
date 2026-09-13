@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.learning.content import get_concept
+from app.learning.quiz_content import get_quiz_question
 
 
 @dataclass(frozen=True)
@@ -10,23 +10,26 @@ class Diagnosis:
 
 
 def diagnose_answer(concept: str, answer: str) -> Diagnosis:
-    learning_concept = get_concept(concept)
+    """Diagnose a quiz answer using the concept's canonical quiz content."""
+    question = get_quiz_question(concept)
 
-    if learning_concept is None:
+    if question is None:
         return Diagnosis(is_correct=False, misconception=None)
 
     normalized = answer.strip().lower()
+    correct = question.correct_answer.strip().lower()
 
-    if normalized in {"although", "even though", "though"}:
+    if normalized == correct:
         return Diagnosis(is_correct=True, misconception=None)
 
-    for contrasted_term, contrasted_meaning in learning_concept.contrast_with.items():
-        if normalized == contrasted_meaning:
+    for choice in question.choices:
+        if choice.strip().lower() == normalized:
             return Diagnosis(
                 is_correct=False,
                 misconception=(
-                    f"Confuses {concept} ({learning_concept.meaning}) "
-                    f"with {contrasted_term} ({contrasted_meaning})."
+                    f'Confuses the correct approach '
+                    f'("{question.correct_answer}") with '
+                    f'the distractor "{choice}".'
                 ),
             )
 

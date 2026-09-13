@@ -2,6 +2,7 @@ import {
   chatStreamEvents,
   type components,
 } from "@ai-fullstack-starter/api-contract";
+
 import { createSseParser } from "./sse";
 
 type ChatRequest = components["schemas"]["ChatRequest"];
@@ -10,15 +11,33 @@ type ErrorResponse = components["schemas"]["ErrorResponse"];
 
 type LearningAnswerRequest =
   components["schemas"]["LearningAnswerRequest"];
+
 type LearningAnswerResponse =
   components["schemas"]["LearningAnswerResponse"];
 
 type LearningQuizResponse =
   components["schemas"]["LearningQuizResponse"];
+
 type LearningQuizAnswerRequest =
   components["schemas"]["LearningQuizAnswerRequest"];
+
 type LearningQuizAnswerResponse =
   components["schemas"]["LearningQuizAnswerResponse"];
+
+type LearningPracticeAnswerRequest =
+  components["schemas"]["LearningPracticeAnswerRequest"];
+
+type LearningPracticeAnswerResponse =
+  components["schemas"]["LearningPracticeAnswerResponse"];
+
+type LearningRetestResponse =
+  components["schemas"]["LearningRetestResponse"];
+
+type LearningRetestAnswerRequest =
+  components["schemas"]["LearningRetestAnswerRequest"];
+
+type LearningRetestAnswerResponse =
+  components["schemas"]["LearningRetestAnswerResponse"];
 
 export const BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
@@ -142,6 +161,89 @@ export async function answerLearningQuiz(
   }
 
   return (await response.json()) as LearningQuizAnswerResponse;
+}
+
+export async function answerLearningPractice(
+  request: LearningPracticeAnswerRequest,
+): Promise<LearningPracticeAnswerResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `${BASE_URL}/api/v1/learning/quiz/practice`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(request),
+      },
+    );
+  } catch {
+    throw new ContractError(
+      "provider_unavailable",
+      "cannot reach the backend",
+    );
+  }
+
+  if (!response.ok) {
+    throw await errorFromResponse(response);
+  }
+
+  return (await response.json()) as LearningPracticeAnswerResponse;
+}
+
+export async function getLearningRetest(
+  concept: string,
+): Promise<LearningRetestResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `${BASE_URL}/api/v1/learning/quiz/retest?concept=${encodeURIComponent(concept)}`,
+    );
+  } catch {
+    throw new ContractError(
+      "provider_unavailable",
+      "cannot reach the backend",
+    );
+  }
+
+  if (!response.ok) {
+    throw await errorFromResponse(response);
+  }
+
+  return (await response.json()) as LearningRetestResponse;
+}
+
+export async function answerLearningRetest(
+  request: LearningRetestAnswerRequest,
+): Promise<LearningRetestAnswerResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `${BASE_URL}/api/v1/learning/quiz/retest`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(request),
+      },
+    );
+  } catch {
+    throw new ContractError(
+      "provider_unavailable",
+      "cannot reach the backend",
+    );
+  }
+
+  if (!response.ok) {
+    throw await errorFromResponse(response);
+  }
+
+  return (await response.json()) as LearningRetestAnswerResponse;
 }
 
 export interface StreamHandlers {

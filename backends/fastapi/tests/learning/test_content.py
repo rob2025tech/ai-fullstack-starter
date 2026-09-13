@@ -1,37 +1,42 @@
 from app.learning.content import get_concept
 
 
-def test_although_concept_has_because_as_contrast():
-    result = get_concept("虽然")
+def test_additive_versioning_concept_exists():
+    result = get_concept("additive-versioning")
 
     assert result is not None
-    assert result.meaning == "although / even though"
-    assert result.contrast_with == {"因为": "because"}
+    assert result.title == "Additive API versioning"
+    assert "adding optional response fields" in result.meaning
+    assert "break" in result.why_it_matters.lower()
+    assert "Add optional fields" in result.key_point
 
 
-def test_because_concept_has_although_as_contrast():
-    result = get_concept("因为")
-
-    assert result is not None
-    assert result.meaning == "because"
-    assert result.contrast_with == {"虽然": "although / even though"}
-
-
-def test_but_concept_has_therefore_as_contrast():
-    result = get_concept("但是")
+def test_contract_first_design_concept_exists():
+    result = get_concept("contract-first-design")
 
     assert result is not None
-    assert result.meaning == "but / however"
-    assert result.contrast_with == {"所以": "therefore / so"}
+    assert result.title == "Contract-first API design"
+    assert "API contract" in result.meaning
+    assert "shared source of truth" in result.key_point
 
 
-def test_therefore_concept_has_but_as_contrast():
-    result = get_concept("所以")
+def test_provider_fallback_concept_exists():
+    result = get_concept("provider-fallback-pattern")
 
     assert result is not None
-    assert result.meaning == "therefore / so"
-    assert result.contrast_with == {"但是": "but / however"}
+    assert result.title == "Provider fallback"
+    assert "fall back" in result.meaning
+    assert "external LLM" in result.key_point
+
+
+def test_spaced_repetition_concept_exists():
+    result = get_concept("spaced-repetition-scheduling")
+
+    assert result is not None
+    assert result.title == "Spaced repetition scheduling"
+    assert "mastery" in result.meaning
+    assert "tested again" in result.key_point
 
 
 def test_unknown_concept_returns_none():
-    assert get_concept("未知") is None
+    assert get_concept("unknown-concept") is None

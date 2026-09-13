@@ -225,6 +225,7 @@ export default function RetentionQuiz() {
       setRetestResult(answer);
 
       if (answer.is_correct) {
+        setComplete(true);
         setStage("complete");
       }
     } catch (err) {

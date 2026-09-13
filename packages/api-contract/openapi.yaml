@@ -1,4 +1,5 @@
 openapi: 3.1.0
+
 info:
   title: AI Fullstack Starter API
   version: 1.0.0
@@ -16,9 +17,11 @@ info:
       shapes.
     - v1 has no authentication; user_id is an anonymous client-supplied
       scope, not an identity.
+
 servers:
   - url: http://127.0.0.1:8000
     description: Local development
+
 tags:
   - name: health
     description: Liveness probes
@@ -26,6 +29,7 @@ tags:
     description: Prompt in, completion out
   - name: learning
     description: Adaptive learning state and answer evaluation
+
 paths:
   /api/v1/health:
     get:
@@ -152,6 +156,7 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "500":
           $ref: "#/components/responses/InternalError"
+
   /api/v1/learning/quiz:
     get:
       operationId: getLearningQuiz
@@ -189,7 +194,10 @@ paths:
               $ref: "#/components/schemas/LearningQuizAnswerRequest"
       responses:
         "200":
-          description: Quiz result and updated learning state.
+          description: |
+            Quiz result, updated learning state, and adaptive teaching
+            information. When the answer is incorrect, the response includes
+            the correct answer, explanation, and targeted practice question.
           content:
             application/json:
               schema:
@@ -198,6 +206,76 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "500":
           $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/quiz/practice:
+    post:
+      operationId: answerLearningPractice
+      tags: [learning]
+      summary: Evaluate targeted practice after adaptive teaching
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearningPracticeAnswerRequest"
+      responses:
+        "200":
+          description: Targeted practice result and updated learning state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningPracticeAnswerResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/learning/quiz/retest:
+    get:
+      operationId: getLearningRetest
+      tags: [learning]
+      summary: Get a fresh retention retest question
+      parameters:
+        - name: concept
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Fresh retest question.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningRetestResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: answerLearningRetest
+      tags: [learning]
+      summary: Evaluate a retest answer and update mastery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearningRetestAnswerRequest"
+      responses:
+        "200":
+          description: Retest result and updated learning state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningRetestAnswerResponse"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   responses:
     InvalidRequest:
@@ -312,6 +390,7 @@ components:
         - mastery
         - attempts
         - correct_count
+        - next_review_at
       properties:
         user_id:
           type: string
@@ -330,7 +409,7 @@ components:
         last_misconception:
           type: [string, "null"]
         next_review_at:
-          type: [string, "null"]
+          type: string
           format: date-time
 
     LearningAnswerRequest:
@@ -405,6 +484,7 @@ components:
           format: date-time
         teaching:
           $ref: "#/components/schemas/TeachingResponse"
+
     LearningQuizResponse:
       type: object
       required:
@@ -421,7 +501,6 @@ components:
           type: array
           items:
             type: string
-        #   type: string
         bloom_level:
           type: string
           enum:
@@ -455,6 +534,8 @@ components:
         - user_id
         - concept
         - is_correct
+        - selected_answer
+        - correct_answer
         - mastery_before
         - mastery_after
         - attempts
@@ -467,6 +548,10 @@ components:
           type: string
         is_correct:
           type: boolean
+        selected_answer:
+          type: string
+        correct_answer:
+          type: string
         mastery_before:
           type: number
           minimum: 0
@@ -484,6 +569,165 @@ components:
         next_review_at:
           type: string
           format: date-time
+        explanation:
+          type: [string, "null"]
+        misconception:
+          type: [string, "null"]
+        practice_question:
+          type: [string, "null"]
+        practice_choices:
+          type: [array, "null"]
+          items:
+            type: string
+
+    LearningPracticeAnswerRequest:
+      type: object
+      required:
+        - user_id
+        - concept
+        - selected_answer
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+        concept:
+          type: string
+          minLength: 1
+        selected_answer:
+          type: string
+          minLength: 1
+
+    LearningPracticeAnswerResponse:
+      type: object
+      required:
+        - user_id
+        - concept
+        - is_correct
+        - selected_answer
+        - correct_answer
+        - mastery_before
+        - mastery_after
+        - attempts
+        - correct_count
+        - next_review_at
+      properties:
+        user_id:
+          type: string
+        concept:
+          type: string
+        is_correct:
+          type: boolean
+        selected_answer:
+          type: string
+        correct_answer:
+          type: string
+        mastery_before:
+          type: number
+          minimum: 0
+          maximum: 1
+        mastery_after:
+          type: number
+          minimum: 0
+          maximum: 1
+        attempts:
+          type: integer
+          minimum: 0
+        correct_count:
+          type: integer
+          minimum: 0
+        next_review_at:
+          type: string
+          format: date-time
+        explanation:
+          type: [string, "null"]
+
+    LearningRetestResponse:
+      type: object
+      required:
+        - concept
+        - question
+        - choices
+        - bloom_level
+      properties:
+        concept:
+          type: string
+        question:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        bloom_level:
+          type: string
+          enum:
+            - remember
+            - understand
+            - apply
+            - analyze
+            - evaluate
+            - create
+
+    LearningRetestAnswerRequest:
+      type: object
+      required:
+        - user_id
+        - concept
+        - selected_answer
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+        concept:
+          type: string
+          minLength: 1
+        selected_answer:
+          type: string
+          minLength: 1
+
+    LearningRetestAnswerResponse:
+      type: object
+      required:
+        - user_id
+        - concept
+        - is_correct
+        - selected_answer
+        - correct_answer
+        - mastery_before
+        - mastery_after
+        - attempts
+        - correct_count
+        - next_review_at
+      properties:
+        user_id:
+          type: string
+        concept:
+          type: string
+        is_correct:
+          type: boolean
+        selected_answer:
+          type: string
+        correct_answer:
+          type: string
+        mastery_before:
+          type: number
+          minimum: 0
+          maximum: 1
+        mastery_after:
+          type: number
+          minimum: 0
+          maximum: 1
+        attempts:
+          type: integer
+          minimum: 0
+        correct_count:
+          type: integer
+          minimum: 0
+        next_review_at:
+          type: string
+          format: date-time
+        misconception:
+          type: [string, "null"]
+
     Error:
       type: object
       required: [code, message]
