@@ -14,8 +14,8 @@ from app.learning.quiz_content import (
     get_retest_question,
 )
 from app.learning.service import LearningService
+from app.models.error_models import ErrorResponse
 from app.models.learning_models import (
-    ErrorResponse,
     LearningAnswerRequest,
     LearningAnswerResponse,
     LearningPracticeAnswerRequest,

@@ -9,8 +9,8 @@ class LearningStateResponse(BaseModel):
     mastery: float
     attempts: int
     correct_count: int
-    last_misconception: str | None
-    next_review_at: datetime
+    last_misconception: str | None = None
+    next_review_at: datetime | None
 
 
 class LearningAnswerRequest(BaseModel):
@@ -23,13 +23,13 @@ class LearningAnswerResponse(BaseModel):
     user_id: str
     concept: str
     is_correct: bool
-    misconception: str | None
+    misconception: str | None = None
     mastery_before: float
     mastery_after: float
     attempts: int
     correct_count: int
-    next_review_at: datetime
-    teaching: "TeachingResponse | None"
+    next_review_at: datetime | None
+    teaching: "TeachingResponse | None" = None
 
 
 class TeachingResponse(BaseModel):
@@ -61,11 +61,11 @@ class LearningQuizAnswerResponse(BaseModel):
     mastery_after: float
     attempts: int
     correct_count: int
-    next_review_at: datetime
-    explanation: str | None
-    misconception: str | None
-    practice_question: str | None
-    practice_choices: list[str] | None
+    next_review_at: datetime | None
+    explanation: str | None = None
+    misconception: str | None = None
+    practice_question: str | None = None
+    practice_choices: list[str] | None = None
 
 
 class LearningPracticeAnswerRequest(BaseModel):
@@ -84,8 +84,8 @@ class LearningPracticeAnswerResponse(BaseModel):
     mastery_after: float
     attempts: int
     correct_count: int
-    next_review_at: datetime
-    explanation: str | None
+    next_review_at: datetime | None
+    explanation: str | None = None
 
 
 class LearningRetestResponse(BaseModel):
@@ -111,9 +111,5 @@ class LearningRetestAnswerResponse(BaseModel):
     mastery_after: float
     attempts: int
     correct_count: int
-    next_review_at: datetime
-    misconception: str | None
-
-
-class ErrorResponse(BaseModel):
-    detail: str
+    next_review_at: datetime | None
+    misconception: str | None = None

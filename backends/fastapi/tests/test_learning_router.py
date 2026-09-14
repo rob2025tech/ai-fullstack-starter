@@ -6,14 +6,14 @@ def test_get_learning_state_returns_initial_state(client: TestClient):
         "/api/v1/learning/state",
         params={
             "user_id": "student-1",
-            "concept": "虽然",
+            "concept": "additive-versioning",
         },
     )
 
     assert response.status_code == 200
     assert response.json() == {
         "user_id": "student-1",
-        "concept": "虽然",
+        "concept": "additive-versioning",
         "mastery": 0.32,
         "attempts": 0,
         "correct_count": 0,
@@ -27,8 +27,8 @@ def test_answer_wrong_response_updates_learning_state(client: TestClient):
         "/api/v1/learning/answer",
         json={
             "user_id": "student-1",
-            "concept": "虽然",
-            "answer": "because",
+            "concept": "additive-versioning",
+            "answer": "Removing an existing response field",
         },
     )
 
@@ -37,10 +37,10 @@ def test_answer_wrong_response_updates_learning_state(client: TestClient):
     body = response.json()
 
     assert body["user_id"] == "student-1"
-    assert body["concept"] == "虽然"
+    assert body["concept"] == "additive-versioning"
     assert body["is_correct"] is False
     assert body["misconception"] is not None
-    assert "因为" in body["misconception"]
+    assert "Removing an existing response field" in body["misconception"]
     assert body["mastery_before"] == 0.32
     assert body["mastery_after"] == 0.27
     assert body["attempts"] == 1
@@ -53,8 +53,8 @@ def test_answer_correct_response_updates_learning_state(client: TestClient):
         "/api/v1/learning/answer",
         json={
             "user_id": "student-1",
-            "concept": "虽然",
-            "answer": "because",
+            "concept": "additive-versioning",
+            "answer": "Removing an existing response field",
         },
     )
 
@@ -62,8 +62,8 @@ def test_answer_correct_response_updates_learning_state(client: TestClient):
         "/api/v1/learning/answer",
         json={
             "user_id": "student-1",
-            "concept": "虽然",
-            "answer": "although",
+            "concept": "additive-versioning",
+            "answer": "Adding a new optional field to a response",
         },
     )
 
@@ -84,8 +84,8 @@ def test_learning_state_persists_between_requests(client: TestClient):
         "/api/v1/learning/answer",
         json={
             "user_id": "student-1",
-            "concept": "虽然",
-            "answer": "because",
+            "concept": "additive-versioning",
+            "answer": "Removing an existing response field",
         },
     )
 
@@ -93,7 +93,7 @@ def test_learning_state_persists_between_requests(client: TestClient):
         "/api/v1/learning/state",
         params={
             "user_id": "student-1",
-            "concept": "虽然",
+            "concept": "additive-versioning",
         },
     )
 
@@ -113,8 +113,8 @@ def test_learning_state_isolated_between_students(client: TestClient):
         "/api/v1/learning/answer",
         json={
             "user_id": "student-1",
-            "concept": "虽然",
-            "answer": "although",
+            "concept": "additive-versioning",
+            "answer": "Adding a new optional field to a response",
         },
     )
 
@@ -122,7 +122,7 @@ def test_learning_state_isolated_between_students(client: TestClient):
         "/api/v1/learning/state",
         params={
             "user_id": "student-2",
-            "concept": "虽然",
+            "concept": "additive-versioning",
         },
     )
 

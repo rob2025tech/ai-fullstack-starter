@@ -409,7 +409,7 @@ components:
         last_misconception:
           type: [string, "null"]
         next_review_at:
-          type: string
+          type: [string, "null"]
           format: date-time
 
     LearningAnswerRequest:
@@ -480,7 +480,7 @@ components:
           type: integer
           minimum: 0
         next_review_at:
-          type: string
+          type: [string, "null"]
           format: date-time
         teaching:
           $ref: "#/components/schemas/TeachingResponse"
@@ -567,7 +567,7 @@ components:
           type: integer
           minimum: 0
         next_review_at:
-          type: string
+          type: [string, "null"]
           format: date-time
         explanation:
           type: [string, "null"]
@@ -636,7 +636,7 @@ components:
           type: integer
           minimum: 0
         next_review_at:
-          type: string
+          type: [string, "null"]
           format: date-time
         explanation:
           type: [string, "null"]
@@ -723,7 +723,7 @@ components:
           type: integer
           minimum: 0
         next_review_at:
-          type: string
+          type: [string, "null"]
           format: date-time
         misconception:
           type: [string, "null"]

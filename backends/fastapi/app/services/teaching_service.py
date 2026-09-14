@@ -32,6 +32,7 @@ class TeachingService:
             explanation=explanation,
             practice_question=fallback.practice_question,
             choices=fallback.choices,
+            practice_correct_answer=fallback.practice_correct_answer,
         )
 
     @staticmethod

@@ -22,33 +22,55 @@ class FailingTeachingProvider(LLMProvider):
 
 @pytest.mark.anyio
 async def test_teaching_service_uses_provider_for_explanation():
-    provider = FakeTeachingProvider("Although introduces a contrast.")
+    provider = FakeTeachingProvider(
+        "Adding an optional field preserves compatibility."
+    )
     service = TeachingService(provider)
 
-    result = await service.generate("虽然", None)
+    result = await service.generate("additive-versioning", None)
 
     assert result is not None
-    assert result.explanation == "Although introduces a contrast."
-    assert result.practice_question == "Which meaning best matches 虽然?"
-    assert result.choices == ("although / even though", "because")
+    assert result.explanation == (
+        "Adding an optional field preserves compatibility."
+    )
+    assert result.practice_question == (
+        "Your v1 API already returns user_id and mastery. You need to add "
+        "next_review_at for newer clients. What is the safest change?"
+    )
+    assert result.choices == (
+        "Add next_review_at as a new optional response field",
+        "Remove mastery and replace it with next_review_at",
+        "Rename /api/v1/learning/state to /api/v2/learning/state immediately",
+        "Change the meaning of mastery so it contains the review date",
+    )
     assert len(provider.prompts) == 1
-    assert "Target concept: 虽然" in provider.prompts[0]
+    assert "Target concept: additive-versioning" in provider.prompts[0]
 
 
 @pytest.mark.anyio
 async def test_teaching_service_includes_misconception_in_prompt():
-    provider = FakeTeachingProvider("虽然 means although, not because.")
+    provider = FakeTeachingProvider(
+        "Adding a field is safer than removing one."
+    )
     service = TeachingService(provider)
 
+    misconception = (
+        'Confuses the correct approach '
+        '("Adding a new optional field to a response") with '
+        'the distractor "Removing an existing response field".'
+    )
+
     result = await service.generate(
-        "虽然",
-        "Confuses 虽然 (although / even though) with 因为 (because).",
+        "additive-versioning",
+        misconception,
     )
 
     assert result is not None
-    assert result.explanation == "虽然 means although, not because."
+    assert result.explanation == (
+        "Adding a field is safer than removing one."
+    )
     assert "Known misconception:" in provider.prompts[0]
-    assert "因为" in provider.prompts[0]
+    assert "Removing an existing response field" in provider.prompts[0]
 
 
 @pytest.mark.anyio
@@ -56,25 +78,33 @@ async def test_teaching_service_falls_back_when_provider_unavailable():
     service = TeachingService(FailingTeachingProvider())
 
     result = await service.generate(
-        "虽然",
-        "Confuses 虽然 (although / even though) with 因为 (because).",
+        "additive-versioning",
+        "Confuses additive changes with breaking changes.",
     )
 
     assert result is not None
-    assert "因为 means because" in result.explanation
-    assert result.practice_question == "Which meaning best matches 虽然?"
-    assert result.choices == ("although / even though", "because")
+    assert "additive api versioning" in result.explanation.lower()
+    assert result.practice_question == (
+        "Your v1 API already returns user_id and mastery. You need to add "
+        "next_review_at for newer clients. What is the safest change?"
+    )
+    assert result.choices == (
+        "Add next_review_at as a new optional response field",
+        "Remove mastery and replace it with next_review_at",
+        "Rename /api/v1/learning/state to /api/v2/learning/state immediately",
+        "Change the meaning of mastery so it contains the review date",
+    )
 
 
 @pytest.mark.anyio
 async def test_teaching_service_without_provider_is_deterministic():
     service = TeachingService()
 
-    result = await service.generate("虽然", None)
+    result = await service.generate("additive-versioning", None)
 
     assert result is not None
-    assert "although / even though" in result.explanation
-    assert "因为" not in result.explanation
+    assert "additive api versioning" in result.explanation.lower()
+    assert "next_review_at" in result.practice_question
 
 
 @pytest.mark.anyio
