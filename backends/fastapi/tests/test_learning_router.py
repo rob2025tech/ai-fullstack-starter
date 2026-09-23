@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 
-from app.auth.sessions import issue_session
+from app.auth.sessions import issue_anonymous_session
 
 
 def _auth_headers(client: TestClient, user_id: str) -> dict[str, str]:
-    token = issue_session(
+    token = issue_anonymous_session(
         client.app.state.settings,
         user_id,
     )

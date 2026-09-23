@@ -35,3 +35,10 @@
 - **Files:** 2 (+647/-0)
 - **Duration:** 263ss
 - **Approach:** Ran openapi-typescript v7 (via npx since devDependencies were not installed) against packages/api-contract/openapi.yaml to regenerate packages/api-contract/src/generated/schema.ts. The generated file reflects all WO-002 security additions: the Unauthorized response component, the 'unauthorized' Error code enum value, and 401 response entries on all five protected learning operations. Updated .gitignore to add an exception (!packages/api-contract/src/generated/schema.ts) so the generated artifact is tracked on this branch per the WO edge-case requirement. packages/api-contract/src/index.ts was unchanged — it already re-exports the generated schema via 'export type * from ./generated/schema.js' and exports chatStreamEvents/ChatStreamEventName without modification.
+
+## WO-005: User Story: WO-005 - Make learning user_id non-authoritative
+- **Status:** completed
+- **Commit:** `8f7680d`
+- **Files:** 5 (+70/-16)
+- **Duration:** 327ss
+- **Approach:** Made user_id optional (str | None = None) on all four learning request models in learning_models.py. Updated openapi.yaml to remove user_id from required[] on the same four schemas to keep the FastAPI-emitted schema in sync with the canonical contract. Regenerated schema.ts via openapi-typescript v7. Fixed broken test imports (issue_session renamed to issue_anonymous_session in WO-003) in both test files. Added three new quiz tests covering requests that omit user_id entirely. The router already used learner.user_id from LearnerContext throughout — no router changes were needed.

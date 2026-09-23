@@ -228,7 +228,7 @@ export interface components {
             next_review_at: string | null;
         };
         LearningAnswerRequest: {
-            user_id: string;
+            user_id?: string;
             concept: string;
             answer: string;
         };
@@ -258,7 +258,7 @@ export interface components {
             bloom_level: "remember" | "understand" | "apply" | "analyze" | "evaluate" | "create";
         };
         LearningQuizAnswerRequest: {
-            user_id: string;
+            user_id?: string;
             concept: string;
             selected_answer: string;
         };
@@ -280,7 +280,7 @@ export interface components {
             practice_choices?: string[] | null;
         };
         LearningPracticeAnswerRequest: {
-            user_id: string;
+            user_id?: string;
             concept: string;
             selected_answer: string;
         };
@@ -306,7 +306,7 @@ export interface components {
             bloom_level: "remember" | "understand" | "apply" | "analyze" | "evaluate" | "create";
         };
         LearningRetestAnswerRequest: {
-            user_id: string;
+            user_id?: string;
             concept: string;
             selected_answer: string;
         };

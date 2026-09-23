@@ -1,4 +1,4 @@
-from app.auth.sessions import issue_session
+from app.auth.sessions import issue_anonymous_session
 from app.learning.repository import InMemoryLearningRepository
 from app.learning.service import LearningService
 from app.main import create_app
@@ -14,7 +14,7 @@ def make_client() -> TestClient:
 
 
 def auth_headers(client: TestClient, user_id: str) -> dict[str, str]:
-    token = issue_session(
+    token = issue_anonymous_session(
         client.app.state.settings,
         user_id,
     )
@@ -245,3 +245,61 @@ def test_answer_learning_retest_uses_authenticated_identity() -> None:
     body = response.json()
 
     assert body["user_id"] == "quiz-student"
+
+
+def test_answer_learning_quiz_without_user_id_uses_trusted_identity() -> None:
+    client = make_client()
+    headers = auth_headers(client, "learner-a")
+
+    response = client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["user_id"] == "learner-a"
+    assert body["is_correct"] is True
+
+
+def test_answer_learning_practice_without_user_id_uses_trusted_identity() -> None:
+    client = make_client()
+    headers = auth_headers(client, "learner-a")
+
+    response = client.post(
+        "/api/v1/learning/quiz/practice",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "anything",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["user_id"] == "learner-a"
+
+
+def test_answer_learning_retest_without_user_id_uses_trusted_identity() -> None:
+    client = make_client()
+    headers = auth_headers(client, "learner-b")
+
+    response = client.post(
+        "/api/v1/learning/quiz/retest",
+        json={
+            "concept": "additive-versioning",
+            "selected_answer": "Add the new field without removing or changing existing fields",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["user_id"] == "learner-b"
