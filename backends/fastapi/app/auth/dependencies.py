@@ -1,8 +1,10 @@
+"""FastAPI dependency providers for session-authenticated requests."""
+
 from dataclasses import dataclass
 
 from fastapi import Header, HTTPException, Request, status
 
-from app.auth.sessions import SessionError, validate_session
+from app.auth.sessions import SessionValidationError, validate_session_token
 from app.config.settings import Settings
 
 
@@ -42,11 +44,11 @@ def get_learner_context(
         )
 
     try:
-        session = validate_session(settings, token)
-    except SessionError as exc:
+        claims = validate_session_token(settings, token)
+    except SessionValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired session",
         ) from exc
 
-    return LearnerContext(user_id=session.user_id)
+    return LearnerContext(user_id=claims.sub)

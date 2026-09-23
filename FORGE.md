@@ -21,3 +21,10 @@
 - **Files:** 2 (+135/-2)
 - **Duration:** 209ss
 - **Approach:** Made additive changes to packages/api-contract/openapi.yaml in three layers: (1) updated info.description to document local no-secret vs shared-demo/production protected-mode authentication; (2) added components.securitySchemes with sessionCookie (apiKey/cookie/name:session) and sessionBearer (http/bearer), added 'unauthorized' to Error.code.enum, and added a missingSession example to the existing Unauthorized response component; (3) added security: [{sessionCookie:[]},{sessionBearer:[]}] requirements and operation-level descriptions on all five protected learning operations. Extended spec.test.ts with four new test cases covering securitySchemes structure, Unauthorized component schema ref, unauthorized error code membership, a loop over all five protected operations asserting both security array and 401 $ref, and a test confirming health/chat remain anonymous.
+
+## WO-003: User Story: WO-003 - Implement signed anonymous sessions
+- **Status:** completed
+- **Commit:** `fff2eb1`
+- **Files:** 5 (+377/-107)
+- **Duration:** 363ss
+- **Approach:** Rewrote the pre-existing hand-rolled HMAC sessions.py to use PyJWT 2.x (HS256) with the function and type names required by the work order: issue_anonymous_session, validate_session_token, SessionClaims, SessionValidationError. Added an injectable `now: int | None = None` parameter to both public functions so expiry tests can use a fixed timestamp without sleeping. When `now` is provided, PyJWT's built-in expiry check is disabled via options={'verify_exp': False} and a manual >= boundary check is performed instead. Updated dependencies.py to use the new names (validate_session_token, SessionValidationError, claims.sub). Added PyJWT>=2.9 to pyproject.toml. Created tests/auth/__init__.py and tests/auth/test_sessions.py with 17 deterministic test cases using a fixed timestamp (_NOW=1_700_000_000) and a placeholder secret.
