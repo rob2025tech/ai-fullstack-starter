@@ -8,7 +8,7 @@ from app.core.errors import BackendError
 from app.learning.repository import InMemoryLearningRepository
 from app.models.error_models import Error, ErrorResponse
 from app.providers.llm.registry import build_llm_provider
-from app.routers import chat, health, learning
+from app.routers import chat, health, learning, session
 from app.learning.service import LearningService
 from app.services.chat_service import ChatService
 from app.services.teaching_service import TeachingService
@@ -44,6 +44,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(session.router)
     app.include_router(learning.router)
 
     @app.exception_handler(RequestValidationError)

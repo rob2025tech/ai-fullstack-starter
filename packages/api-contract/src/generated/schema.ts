@@ -48,6 +48,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue an anonymous learner session
+         * @description Issues a signed, expiring anonymous learner session for browser
+         *     (cookie) or mobile (bearer) clients.  No prior credentials are
+         *     required.  The session scopes a single anonymous learner for the
+         *     server-configured TTL.  Bearer token values in examples are
+         *     placeholders only.
+         */
+        post: operations["createSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bootstrap an anonymous session
+         * @description Issues an anonymous session for browser (cookie) or mobile
+         *     (bearer) clients.  This endpoint requires no prior credentials;
+         *     it is the entry point for protected learning sessions.  The
+         *     returned session scopes a single anonymous learner for the
+         *     server-configured TTL.  Bearer token values in examples are
+         *     placeholders only and must never contain real secrets.
+         */
+        post: operations["bootstrapSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/state": {
         parameters: {
             query?: never;
@@ -342,6 +391,39 @@ export interface components {
         SseDeltaEvent: {
             content: string;
         };
+        SessionBootstrapRequest: {
+            /**
+             * @description Transport mode for the issued session.  `cookie` is the
+             *     browser-preferred transport; the server sets an HttpOnly
+             *     session cookie in the Set-Cookie response header.  `bearer`
+             *     is the mobile-preferred transport; the server returns
+             *     `access_token` in the JSON body for use as an
+             *     Authorization: Bearer token on protected requests.
+             * @default cookie
+             * @enum {string}
+             */
+            transport: "cookie" | "bearer";
+        };
+        SessionBootstrapResponse: {
+            /** @description Server-assigned anonymous learner identifier for this session. */
+            user_id: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 datetime when this session expires.
+             */
+            expires_at: string;
+            /**
+             * @description Transport type that was issued.
+             * @enum {string}
+             */
+            token_type: "cookie" | "bearer";
+            /**
+             * @description Signed session token for bearer transport.  Null or absent
+             *     for cookie transport.  Carry in the Authorization header as
+             *     `Bearer <access_token>` on subsequent protected requests.
+             */
+            access_token?: string | null;
+        };
     };
     responses: {
         /** @description Request failed validation. */
@@ -454,6 +536,72 @@ export interface operations {
             500: components["responses"]["InternalError"];
             502: components["responses"]["ProviderError"];
             503: components["responses"]["ProviderUnavailable"];
+        };
+    };
+    createSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionBootstrapRequest"];
+            };
+        };
+        responses: {
+            /** @description Session issued successfully. */
+            200: {
+                headers: {
+                    /**
+                     * @description Signed session cookie for browser clients when transport
+                     *     is `cookie`.  The cookie name is `session`, HttpOnly,
+                     *     and scoped to the API origin.
+                     * @example session=<signed-demo-token>; HttpOnly; Path=/
+                     */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBootstrapResponse"];
+                };
+            };
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    bootstrapSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionBootstrapRequest"];
+            };
+        };
+        responses: {
+            /** @description Session bootstrapped successfully. */
+            200: {
+                headers: {
+                    /**
+                     * @description Signed session cookie set for browser clients when
+                     *     transport is `cookie`.  The cookie name is `session`,
+                     *     HttpOnly, and scoped to the API origin.
+                     * @example session=<signed-demo-token>; HttpOnly; Path=/
+                     */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBootstrapResponse"];
+                };
+            };
+            422: components["responses"]["InvalidRequest"];
+            500: components["responses"]["InternalError"];
         };
     };
     getLearningState: {

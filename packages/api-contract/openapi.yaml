@@ -119,6 +119,64 @@ paths:
         "503":
           $ref: "#/components/responses/ProviderUnavailable"
 
+  /api/v1/session:
+    post:
+      operationId: createSession
+      tags: [session]
+      summary: Issue an anonymous learner session
+      description: |
+        Issues a signed, expiring anonymous learner session for browser
+        (cookie) or mobile (bearer) clients.  No prior credentials are
+        required.  The session scopes a single anonymous learner for the
+        server-configured TTL.  Bearer token values in examples are
+        placeholders only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionBootstrapRequest"
+            examples:
+              cookieClient:
+                value:
+                  transport: cookie
+              bearerClient:
+                value:
+                  transport: bearer
+      responses:
+        "200":
+          description: Session issued successfully.
+          headers:
+            Set-Cookie:
+              description: |
+                Signed session cookie for browser clients when transport
+                is `cookie`.  The cookie name is `session`, HttpOnly,
+                and scoped to the API origin.
+              schema:
+                type: string
+              example: "session=<signed-demo-token>; HttpOnly; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionBootstrapResponse"
+              examples:
+                cookieClient:
+                  value:
+                    user_id: "anon-abc12345"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: cookie
+                    access_token: null
+                bearerClient:
+                  value:
+                    user_id: "anon-abc12345"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: bearer
+                    access_token: "<signed-demo-token>"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/session/bootstrap:
     post:
       operationId: bootstrapSession

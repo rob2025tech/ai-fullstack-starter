@@ -56,3 +56,10 @@
 - **Files:** 3 (+247/-40)
 - **Duration:** 239ss
 - **Approach:** Rewrote backends/fastapi/app/auth/dependencies.py to use FastAPI security primitives: APIKeyCookie(name='session', auto_error=False) for browser cookie transport and HTTPBearer(auto_error=False) for mobile bearer transport. Cookie takes documented precedence when both are supplied. Local mode without credentials returns LearnerContext(user_id='demo-student') deterministically. Protected modes (shared-demo, production) raise HTTP 401 when no valid credential is supplied. All token cryptography is delegated to validate_session_token in sessions.py. Fixed the broken test_auth_dependencies.py (used old issue_session name). Created tests/auth/test_dependencies.py with 11 targeted tests using minimal FastAPI TestClient routes.
+
+## WO-009: User Story: WO-009 - Add signed session bootstrap route
+- **Status:** completed
+- **Commit:** `e83bf08`
+- **Files:** 6 (+478/-1)
+- **Duration:** 365ss
+- **Approach:** Created app/models/session_models.py with SessionBootstrapRequest and SessionBootstrapResponse Pydantic models matching the existing OpenAPI schemas. Created app/routers/session.py with APIRouter(prefix='/api/v1', tags=['session']) implementing both POST /session (createSession) and POST /session/bootstrap (bootstrapSession) — both delegates to a shared _issue_bootstrap helper that generates an anonymous subject, issues a signed JWT via the existing issue_anonymous_session primitive, and returns the appropriate response for cookie or bearer transport. Wired session.router into main.py's create_app. Added POST /api/v1/session to openapi.yaml reusing existing SessionBootstrapRequest/SessionBootstrapResponse schemas. Regenerated schema.ts. Created tests/test_session_router.py with 12 deterministic tests using placeholder Settings fixtures.
