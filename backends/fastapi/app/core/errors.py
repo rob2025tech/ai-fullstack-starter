@@ -22,3 +22,8 @@ class ProviderError(BackendError):
 class ProviderUnavailableError(BackendError):
     code = "provider_unavailable"
     http_status = 503
+
+
+class UnauthorizedError(BackendError):
+    code = "unauthorized"
+    http_status = 401

@@ -70,3 +70,10 @@
 - **Files:** 2 (+313/-29)
 - **Duration:** 529ss
 - **Approach:** Updated apps/web/lib/api.ts to add a shared jsonPost(body) helper that bakes in credentials: 'include' and explicit body construction. Each of the four mutation helpers (answerLearningQuestion, answerLearningQuiz, answerLearningPractice, answerLearningRetest) now builds its JSON body from concept/answer/selected_answer only — user_id is never serialized even if the caller passes it. Added getLearningState fetching state from /api/v1/learning/state with credentials: 'include' and no user_id query param. Created apps/web/lib/api.test.ts with vi.spyOn(globalThis, 'fetch') mocks asserting exact endpoint URLs, credentials: 'include', absent user_id in bodies/query strings, and deterministic response fixtures.
+
+## WO-010: User Story: WO-010 - Wire protected FastAPI startup policy
+- **Status:** completed
+- **Commit:** `55ab628`
+- **Files:** 4 (+182/-1)
+- **Duration:** 487ss
+- **Approach:** Made create_app the single operational control point for startup policy. Added UnauthorizedError(BackendError) to errors.py and 'unauthorized' to ErrorCode Literal in error_models.py (fixing the pre-existing drift test mismatch — canonical openapi.yaml already had 'unauthorized' in the enum). Updated main.py to: (1) set docs_url/redoc_url=None in protected modes (shared-demo, production) while keeping them for local, (2) change allow_credentials=False to True for credentialed cookie transport, (3) register a StarletteHTTPException handler that maps HTTP 401 to the contract error envelope {error: {code: 'unauthorized', message: '...'}} while delegating other HTTP exceptions to the standard response. Protected-mode startup failure is already enforced by the Settings pydantic model_validator. Created test_main_startup_policy.py with 11 tests covering all acceptance criteria.
