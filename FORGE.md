@@ -84,3 +84,10 @@
 - **Files:** 1 (+76/-0)
 - **Duration:** 194ss
 - **Approach:** The learning router (backends/fastapi/app/routers/learning.py) already uses LearnerContext.user_id for both get_learning_state and answer_learning from prior WOs (WO-007/WO-010). The openapi.yaml already documents 401 + session security on both endpoints. The test file already had identity-isolation tests with JWT-signed fixtures. The only gap was AC-6: no test in test_learning_router.py verified that protected-mode (shared-demo) requests without credentials return 401 with the contract error envelope. Added _SECRET, _shared_demo_client() helper, and three new tests to test_learning_router.py covering the 401 envelope, answer-learning 401, and learner-alpha/learner-beta partition isolation in shared-demo mode.
+
+## WO-012: User Story: WO-012 - Derive identity for quiz mutations
+- **Status:** completed
+- **Commit:** `2f77101`
+- **Files:** 1 (+104/-0)
+- **Duration:** 268ss
+- **Approach:** The learning router (backends/fastapi/app/routers/learning.py) already used LearnerContext.user_id for all three quiz mutation handlers (answer_learning_quiz, answer_learning_practice, answer_learning_retest) from prior WOs, and openapi.yaml already documented 401 + sessionCookie/sessionBearer security on all three endpoints. The test file existed but was missing: (1) the two-session isolation scenario proving learner_alpha's spoofed user_id cannot mutate learner_beta's state partition (AC-5), and (2) explicit protected-mode 401 envelope tests using a proper shared-demo TestClient (AC-7). Added _SECRET constant, _shared_demo_client() helper, one two-session cross-contamination test, and three 401 envelope tests to test_quiz_router.py.
