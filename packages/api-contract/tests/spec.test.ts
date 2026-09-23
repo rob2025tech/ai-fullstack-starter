@@ -102,6 +102,63 @@ describe("canonical OpenAPI spec", () => {
     expect(paths["/api/v1/chat"].post.security).toBeUndefined();
   });
 
+  it("defines POST /api/v1/session/bootstrap with operationId bootstrapSession", () => {
+    const paths = spec.paths as any;
+    const bootstrap = paths["/api/v1/session/bootstrap"]?.post;
+    expect(bootstrap, "POST /api/v1/session/bootstrap must exist").toBeDefined();
+    expect(bootstrap.operationId).toBe("bootstrapSession");
+    expect(bootstrap.tags).toContain("session");
+  });
+
+  it("POST /api/v1/session/bootstrap is not protected by session security", () => {
+    const paths = spec.paths as any;
+    const bootstrap = paths["/api/v1/session/bootstrap"]?.post;
+    expect(bootstrap?.security).toBeUndefined();
+  });
+
+  it("SessionBootstrapRequest transport enum includes cookie and bearer", () => {
+    const schema = (spec.components as any).schemas.SessionBootstrapRequest;
+    expect(schema, "SessionBootstrapRequest schema must exist").toBeDefined();
+    const transportEnum = schema.properties?.transport?.enum as string[];
+    expect(transportEnum, "transport enum must exist").toBeDefined();
+    expect(transportEnum).toContain("cookie");
+    expect(transportEnum).toContain("bearer");
+    expect(schema.properties?.transport?.default).toBe("cookie");
+  });
+
+  it("SessionBootstrapResponse defines required user_id, expires_at, token_type and optional access_token", () => {
+    const schema = (spec.components as any).schemas.SessionBootstrapResponse;
+    expect(schema, "SessionBootstrapResponse schema must exist").toBeDefined();
+    const required: string[] = schema.required ?? [];
+    expect(required).toContain("user_id");
+    expect(required).toContain("expires_at");
+    expect(required).toContain("token_type");
+    expect(schema.properties?.access_token, "access_token property must exist").toBeDefined();
+    expect(required).not.toContain("access_token");
+  });
+
+  it("POST /api/v1/session/bootstrap 200 response documents Set-Cookie header", () => {
+    const paths = spec.paths as any;
+    const response200 = paths["/api/v1/session/bootstrap"]?.post?.responses?.["200"];
+    expect(response200, "200 response must exist").toBeDefined();
+    expect(
+      response200.headers?.["Set-Cookie"],
+      "Set-Cookie header must be documented on 200 response",
+    ).toBeDefined();
+  });
+
+  it("POST /api/v1/session/bootstrap 200 includes cookieClient and bearerClient examples", () => {
+    const paths = spec.paths as any;
+    const examples =
+      paths["/api/v1/session/bootstrap"]?.post?.responses?.["200"]?.content?.[
+        "application/json"
+      ]?.examples;
+    expect(examples?.cookieClient, "cookieClient example must exist").toBeDefined();
+    expect(examples?.bearerClient, "bearerClient example must exist").toBeDefined();
+    expect(examples?.bearerClient?.value?.access_token).toBe("<signed-demo-token>");
+    expect(examples?.cookieClient?.value?.access_token).toBeNull();
+  });
+
   it("resolves every local $ref", () => {
     const refs: string[] = [];
     const walk = (node: unknown): void => {

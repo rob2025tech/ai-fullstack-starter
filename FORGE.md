@@ -42,3 +42,10 @@
 - **Files:** 5 (+70/-16)
 - **Duration:** 327ss
 - **Approach:** Made user_id optional (str | None = None) on all four learning request models in learning_models.py. Updated openapi.yaml to remove user_id from required[] on the same four schemas to keep the FastAPI-emitted schema in sync with the canonical contract. Regenerated schema.ts via openapi-typescript v7. Fixed broken test imports (issue_session renamed to issue_anonymous_session in WO-003) in both test files. Added three new quiz tests covering requests that omit user_id entirely. The router already used learner.user_id from LearnerContext throughout — no router changes were needed.
+
+## WO-006: User Story: WO-006 - Document session bootstrap API contract
+- **Status:** completed
+- **Commit:** `9a2a1d6`
+- **Files:** 2 (+158/-0)
+- **Duration:** 188ss
+- **Approach:** Added POST /api/v1/session/bootstrap to openapi.yaml as a pure contract change. Defined SessionBootstrapRequest (transport enum: cookie, bearer; default cookie) and SessionBootstrapResponse (required: user_id, expires_at, token_type; access_token nullable/optional for cookie transport) as reusable components.schemas. The new path is unauthenticated (no security: requirement) and documents a Set-Cookie response header for browser clients and cookieClient/bearerClient examples using placeholder tokens only. Extended spec.test.ts with five targeted assertions covering all acceptance criteria. No TypeScript regeneration in this story per the constraint.

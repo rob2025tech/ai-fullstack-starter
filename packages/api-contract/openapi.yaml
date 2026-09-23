@@ -42,6 +42,8 @@ tags:
     description: Prompt in, completion out
   - name: learning
     description: Adaptive learning state and answer evaluation
+  - name: session
+    description: Anonymous session bootstrap
 
 paths:
   /api/v1/health:
@@ -116,6 +118,65 @@ paths:
           $ref: "#/components/responses/ProviderError"
         "503":
           $ref: "#/components/responses/ProviderUnavailable"
+
+  /api/v1/session/bootstrap:
+    post:
+      operationId: bootstrapSession
+      tags: [session]
+      summary: Bootstrap an anonymous session
+      description: |
+        Issues an anonymous session for browser (cookie) or mobile
+        (bearer) clients.  This endpoint requires no prior credentials;
+        it is the entry point for protected learning sessions.  The
+        returned session scopes a single anonymous learner for the
+        server-configured TTL.  Bearer token values in examples are
+        placeholders only and must never contain real secrets.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionBootstrapRequest"
+            examples:
+              cookieClient:
+                value:
+                  transport: cookie
+              bearerClient:
+                value:
+                  transport: bearer
+      responses:
+        "200":
+          description: Session bootstrapped successfully.
+          headers:
+            Set-Cookie:
+              description: |
+                Signed session cookie set for browser clients when
+                transport is `cookie`.  The cookie name is `session`,
+                HttpOnly, and scoped to the API origin.
+              schema:
+                type: string
+              example: "session=<signed-demo-token>; HttpOnly; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionBootstrapResponse"
+              examples:
+                cookieClient:
+                  value:
+                    user_id: "anon-demo-abc123"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: cookie
+                    access_token: null
+                bearerClient:
+                  value:
+                    user_id: "anon-demo-abc123"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: bearer
+                    access_token: "<signed-demo-token>"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/learning/state:
     get:
@@ -846,3 +907,43 @@ components:
       properties:
         content:
           type: string
+
+    SessionBootstrapRequest:
+      type: object
+      properties:
+        transport:
+          type: string
+          enum: [cookie, bearer]
+          default: cookie
+          description: |
+            Transport mode for the issued session.  `cookie` is the
+            browser-preferred transport; the server sets an HttpOnly
+            session cookie in the Set-Cookie response header.  `bearer`
+            is the mobile-preferred transport; the server returns
+            `access_token` in the JSON body for use as an
+            Authorization: Bearer token on protected requests.
+
+    SessionBootstrapResponse:
+      type: object
+      required:
+        - user_id
+        - expires_at
+        - token_type
+      properties:
+        user_id:
+          type: string
+          description: Server-assigned anonymous learner identifier for this session.
+        expires_at:
+          type: string
+          format: date-time
+          description: ISO 8601 datetime when this session expires.
+        token_type:
+          type: string
+          enum: [cookie, bearer]
+          description: Transport type that was issued.
+        access_token:
+          type: [string, "null"]
+          description: |
+            Signed session token for bearer transport.  Null or absent
+            for cookie transport.  Carry in the Authorization header as
+            `Bearer <access_token>` on subsequent protected requests.
