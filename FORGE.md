@@ -49,3 +49,10 @@
 - **Files:** 2 (+158/-0)
 - **Duration:** 188ss
 - **Approach:** Added POST /api/v1/session/bootstrap to openapi.yaml as a pure contract change. Defined SessionBootstrapRequest (transport enum: cookie, bearer; default cookie) and SessionBootstrapResponse (required: user_id, expires_at, token_type; access_token nullable/optional for cookie transport) as reusable components.schemas. The new path is unauthenticated (no security: requirement) and documents a Set-Cookie response header for browser clients and cookieClient/bearerClient examples using placeholder tokens only. Extended spec.test.ts with five targeted assertions covering all acceptance criteria. No TypeScript regeneration in this story per the constraint.
+
+## WO-007: User Story: WO-007 - Add learner context dependency
+- **Status:** completed
+- **Commit:** `208251e`
+- **Files:** 3 (+247/-40)
+- **Duration:** 239ss
+- **Approach:** Rewrote backends/fastapi/app/auth/dependencies.py to use FastAPI security primitives: APIKeyCookie(name='session', auto_error=False) for browser cookie transport and HTTPBearer(auto_error=False) for mobile bearer transport. Cookie takes documented precedence when both are supplied. Local mode without credentials returns LearnerContext(user_id='demo-student') deterministically. Protected modes (shared-demo, production) raise HTTP 401 when no valid credential is supplied. All token cryptography is delegated to validate_session_token in sessions.py. Fixed the broken test_auth_dependencies.py (used old issue_session name). Created tests/auth/test_dependencies.py with 11 targeted tests using minimal FastAPI TestClient routes.
