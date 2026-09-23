@@ -1,6 +1,11 @@
 from fastapi.testclient import TestClient
 
 from app.auth.sessions import issue_anonymous_session
+from app.config.settings import Settings
+from app.main import create_app
+
+# Placeholder secret used only in deterministic test fixtures (AC-5)
+_SECRET = "test-learning-router-secret-minimum-32b"
 
 
 def _auth_headers(client: TestClient, user_id: str) -> dict[str, str]:
@@ -9,6 +14,19 @@ def _auth_headers(client: TestClient, user_id: str) -> dict[str, str]:
         user_id,
     )
     return {"Authorization": f"Bearer {token}"}
+
+
+def _shared_demo_client() -> TestClient:
+    """Shared-demo TestClient with a placeholder signing secret (AC-6)."""
+    return TestClient(
+        create_app(
+            Settings(
+                _env_file=None,
+                deployment_mode="shared-demo",
+                session_secret=_SECRET,
+            )
+        )
+    )
 
 
 def test_get_learning_state_returns_initial_state(client: TestClient):
@@ -195,3 +213,61 @@ def test_client_user_id_cannot_override_authenticated_identity(
     assert student_one_state.status_code == 200
     assert student_one_state.json()["attempts"] == 1
     assert student_one_state.json()["correct_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# AC-6: Protected mode — missing session returns 401 with contract envelope
+# ---------------------------------------------------------------------------
+
+
+def test_get_learning_state_without_session_returns_401_in_protected_mode() -> None:
+    """GET /api/v1/learning/state without credentials in shared-demo returns 401 (AC-6)."""
+    client = _shared_demo_client()
+    response = client.get(
+        "/api/v1/learning/state",
+        params={"concept": "additive-versioning"},
+    )
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "unauthorized"
+    assert body["error"]["message"]
+
+
+def test_answer_learning_without_session_returns_401_in_protected_mode() -> None:
+    """POST /api/v1/learning/answer without credentials in shared-demo returns 401 (AC-6)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/answer",
+        json={"concept": "additive-versioning", "answer": "Adding a new optional field"},
+    )
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "unauthorized"
+
+
+def test_session_derived_identity_is_isolated_in_protected_mode() -> None:
+    """Two learners in shared-demo mode see separate state partitions (AC-4, AC-6)."""
+    client = _shared_demo_client()
+
+    alpha_token = issue_anonymous_session(client.app.state.settings, "learner-alpha")
+    beta_token = issue_anonymous_session(client.app.state.settings, "learner-beta")
+    alpha_headers = {"Authorization": f"Bearer {alpha_token}"}
+    beta_headers = {"Authorization": f"Bearer {beta_token}"}
+
+    # learner-alpha answers correctly
+    client.post(
+        "/api/v1/learning/answer",
+        json={"concept": "additive-versioning", "answer": "Adding a new optional field to a response"},
+        headers=alpha_headers,
+    )
+
+    # learner-beta should still see pristine state
+    beta_state = client.get(
+        "/api/v1/learning/state",
+        params={"concept": "additive-versioning"},
+        headers=beta_headers,
+    )
+    assert beta_state.status_code == 200
+    body = beta_state.json()
+    assert body["user_id"] == "learner-beta"
+    assert body["attempts"] == 0

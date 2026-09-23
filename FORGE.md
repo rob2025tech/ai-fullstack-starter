@@ -77,3 +77,10 @@
 - **Files:** 4 (+182/-1)
 - **Duration:** 487ss
 - **Approach:** Made create_app the single operational control point for startup policy. Added UnauthorizedError(BackendError) to errors.py and 'unauthorized' to ErrorCode Literal in error_models.py (fixing the pre-existing drift test mismatch — canonical openapi.yaml already had 'unauthorized' in the enum). Updated main.py to: (1) set docs_url/redoc_url=None in protected modes (shared-demo, production) while keeping them for local, (2) change allow_credentials=False to True for credentialed cookie transport, (3) register a StarletteHTTPException handler that maps HTTP 401 to the contract error envelope {error: {code: 'unauthorized', message: '...'}} while delegating other HTTP exceptions to the standard response. Protected-mode startup failure is already enforced by the Settings pydantic model_validator. Created test_main_startup_policy.py with 11 tests covering all acceptance criteria.
+
+## WO-011: User Story: WO-011 - Derive identity for state and answers
+- **Status:** completed
+- **Commit:** `6529aa4`
+- **Files:** 1 (+76/-0)
+- **Duration:** 194ss
+- **Approach:** The learning router (backends/fastapi/app/routers/learning.py) already uses LearnerContext.user_id for both get_learning_state and answer_learning from prior WOs (WO-007/WO-010). The openapi.yaml already documents 401 + session security on both endpoints. The test file already had identity-isolation tests with JWT-signed fixtures. The only gap was AC-6: no test in test_learning_router.py verified that protected-mode (shared-demo) requests without credentials return 401 with the contract error envelope. Added _SECRET, _shared_demo_client() helper, and three new tests to test_learning_router.py covering the 401 envelope, answer-learning 401, and learner-alpha/learner-beta partition isolation in shared-demo mode.
