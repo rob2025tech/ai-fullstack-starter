@@ -63,3 +63,10 @@
 - **Files:** 6 (+478/-1)
 - **Duration:** 365ss
 - **Approach:** Created app/models/session_models.py with SessionBootstrapRequest and SessionBootstrapResponse Pydantic models matching the existing OpenAPI schemas. Created app/routers/session.py with APIRouter(prefix='/api/v1', tags=['session']) implementing both POST /session (createSession) and POST /session/bootstrap (bootstrapSession) — both delegates to a shared _issue_bootstrap helper that generates an anonymous subject, issues a signed JWT via the existing issue_anonymous_session primitive, and returns the appropriate response for cookie or bearer transport. Wired session.router into main.py's create_app. Added POST /api/v1/session to openapi.yaml reusing existing SessionBootstrapRequest/SessionBootstrapResponse schemas. Regenerated schema.ts. Created tests/test_session_router.py with 12 deterministic tests using placeholder Settings fixtures.
+
+## WO-008: User Story: WO-008 - Make web learning fetches session-aware
+- **Status:** completed
+- **Commit:** `ad2eda8`
+- **Files:** 2 (+313/-29)
+- **Duration:** 529ss
+- **Approach:** Updated apps/web/lib/api.ts to add a shared jsonPost(body) helper that bakes in credentials: 'include' and explicit body construction. Each of the four mutation helpers (answerLearningQuestion, answerLearningQuiz, answerLearningPractice, answerLearningRetest) now builds its JSON body from concept/answer/selected_answer only — user_id is never serialized even if the caller passes it. Added getLearningState fetching state from /api/v1/learning/state with credentials: 'include' and no user_id query param. Created apps/web/lib/api.test.ts with vi.spyOn(globalThis, 'fetch') mocks asserting exact endpoint URLs, credentials: 'include', absent user_id in bodies/query strings, and deterministic response fixtures.

@@ -9,6 +9,9 @@ type ChatRequest = components["schemas"]["ChatRequest"];
 type ChatResponse = components["schemas"]["ChatResponse"];
 type ErrorResponse = components["schemas"]["ErrorResponse"];
 
+type LearningStateResponse =
+  components["schemas"]["LearningStateResponse"];
+
 type LearningAnswerRequest =
   components["schemas"]["LearningAnswerRequest"];
 
@@ -75,6 +78,15 @@ async function errorFromResponse(
   );
 }
 
+function jsonPost(body: unknown): RequestInit {
+  return {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  };
+}
+
 export async function getHealth(): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/v1/health`);
 
@@ -83,19 +95,43 @@ export async function getHealth(): Promise<void> {
   }
 }
 
+export async function getLearningState(
+  concept: string,
+): Promise<LearningStateResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `${BASE_URL}/api/v1/learning/state?concept=${encodeURIComponent(concept)}`,
+      { credentials: "include" },
+    );
+  } catch {
+    throw new ContractError(
+      "provider_unavailable",
+      "cannot reach the backend",
+    );
+  }
+
+  if (!response.ok) {
+    throw await errorFromResponse(response);
+  }
+
+  return (await response.json()) as LearningStateResponse;
+}
+
 export async function answerLearningQuestion(
   request: LearningAnswerRequest,
 ): Promise<LearningAnswerResponse> {
   let response: Response;
 
   try {
-    response = await fetch(`${BASE_URL}/api/v1/learning/answer`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(request),
-    });
+    response = await fetch(
+      `${BASE_URL}/api/v1/learning/answer`,
+      jsonPost({
+        concept: request.concept,
+        answer: request.answer,
+      }),
+    );
   } catch {
     throw new ContractError(
       "provider_unavailable",
@@ -141,13 +177,10 @@ export async function answerLearningQuiz(
   try {
     response = await fetch(
       `${BASE_URL}/api/v1/learning/quiz/answer`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(request),
-      },
+      jsonPost({
+        concept: request.concept,
+        selected_answer: request.selected_answer,
+      }),
     );
   } catch {
     throw new ContractError(
@@ -171,13 +204,10 @@ export async function answerLearningPractice(
   try {
     response = await fetch(
       `${BASE_URL}/api/v1/learning/quiz/practice`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(request),
-      },
+      jsonPost({
+        concept: request.concept,
+        selected_answer: request.selected_answer,
+      }),
     );
   } catch {
     throw new ContractError(
@@ -224,13 +254,10 @@ export async function answerLearningRetest(
   try {
     response = await fetch(
       `${BASE_URL}/api/v1/learning/quiz/retest`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(request),
-      },
+      jsonPost({
+        concept: request.concept,
+        selected_answer: request.selected_answer,
+      }),
     );
   } catch {
     throw new ContractError(
