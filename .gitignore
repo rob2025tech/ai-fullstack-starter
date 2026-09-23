@@ -28,6 +28,8 @@ __pycache__/
 
 # Generated contract artifacts (regenerate, never hand-edit)
 packages/api-contract/src/generated/
+# Track the generated schema so the branch reflects the current contract
+!packages/api-contract/src/generated/schema.ts
 
 # OS / editor
 .DS_Store

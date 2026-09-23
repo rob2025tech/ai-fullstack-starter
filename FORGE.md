@@ -28,3 +28,10 @@
 - **Files:** 5 (+377/-107)
 - **Duration:** 363ss
 - **Approach:** Rewrote the pre-existing hand-rolled HMAC sessions.py to use PyJWT 2.x (HS256) with the function and type names required by the work order: issue_anonymous_session, validate_session_token, SessionClaims, SessionValidationError. Added an injectable `now: int | None = None` parameter to both public functions so expiry tests can use a fixed timestamp without sleeping. When `now` is provided, PyJWT's built-in expiry check is disabled via options={'verify_exp': False} and a manual >= boundary check is performed instead. Updated dependencies.py to use the new names (validate_session_token, SessionValidationError, claims.sub). Added PyJWT>=2.9 to pyproject.toml. Created tests/auth/__init__.py and tests/auth/test_sessions.py with 17 deterministic test cases using a fixed timestamp (_NOW=1_700_000_000) and a placeholder secret.
+
+## WO-004: User Story: WO-004 - Regenerate contract security types
+- **Status:** completed
+- **Commit:** `cb36d4f`
+- **Files:** 2 (+647/-0)
+- **Duration:** 263ss
+- **Approach:** Ran openapi-typescript v7 (via npx since devDependencies were not installed) against packages/api-contract/openapi.yaml to regenerate packages/api-contract/src/generated/schema.ts. The generated file reflects all WO-002 security additions: the Unauthorized response component, the 'unauthorized' Error code enum value, and 401 response entries on all five protected learning operations. Updated .gitignore to add an exception (!packages/api-contract/src/generated/schema.ts) so the generated artifact is tracked on this branch per the WO edge-case requirement. packages/api-contract/src/index.ts was unchanged — it already re-exports the generated schema via 'export type * from ./generated/schema.js' and exports chatStreamEvents/ChatStreamEventName without modification.
