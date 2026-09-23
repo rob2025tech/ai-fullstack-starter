@@ -25,6 +25,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         version=app_settings.contract_version,
         description="Reference implementation of the /api/v1 contract.",
     )
+    app.state.settings = app_settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,

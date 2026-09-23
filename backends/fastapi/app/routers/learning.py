@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
+from app.auth.dependencies import LearnerContext, get_learner_context
 from app.core.errors import InvalidRequestError
 
 from app.learning.quiz import (
@@ -44,19 +45,20 @@ def _unknown_concept_error(concept: str) -> InvalidRequestError:
     "/state",
     response_model=LearningStateResponse,
     responses={
+        401: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
 )
 async def get_learning_state(
-    user_id: str,
     concept: str,
     raw_request: Request,
+    learner: LearnerContext = Depends(get_learner_context),
 ) -> LearningStateResponse:
     service: LearningService = raw_request.app.state.learning_service
 
     state = service.get_state(
-        user_id,
+        learner.user_id,
         concept,
     )
 
@@ -75,6 +77,7 @@ async def get_learning_state(
     "/answer",
     response_model=LearningAnswerResponse,
     responses={
+        401: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
@@ -82,11 +85,12 @@ async def get_learning_state(
 async def answer_learning(
     request: LearningAnswerRequest,
     raw_request: Request,
+    learner: LearnerContext = Depends(get_learner_context),
 ) -> LearningAnswerResponse:
     service: LearningService = raw_request.app.state.learning_service
 
     result = await service.answer(
-        request.user_id,
+        learner.user_id,
         request.concept,
         request.answer,
         now=datetime.now(timezone.utc),
@@ -144,6 +148,7 @@ async def get_learning_quiz(
     "/quiz/answer",
     response_model=LearningQuizAnswerResponse,
     responses={
+        401: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
@@ -151,6 +156,7 @@ async def get_learning_quiz(
 async def answer_learning_quiz(
     request: LearningQuizAnswerRequest,
     raw_request: Request,
+    learner: LearnerContext = Depends(get_learner_context),
 ) -> LearningQuizAnswerResponse:
     question = get_quiz_question(request.concept)
 
@@ -165,7 +171,7 @@ async def answer_learning_quiz(
     service: LearningService = raw_request.app.state.learning_service
 
     adaptive_result = await service.answer_quiz(
-        request.user_id,
+        learner.user_id,
         result,
         now=datetime.now(timezone.utc),
     )
@@ -184,7 +190,7 @@ async def answer_learning_quiz(
         correct_count=adaptive_result.state.correct_count,
         next_review_at=adaptive_result.state.next_review_at,
         explanation=adaptive_result.explanation,
-        misconception=adaptive_result.misconception,
+        misconception=adaptive_result.state.last_misconception,
         practice_question=(
             None
             if practice_question is None
@@ -202,6 +208,7 @@ async def answer_learning_quiz(
     "/quiz/practice",
     response_model=LearningPracticeAnswerResponse,
     responses={
+        401: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
@@ -209,6 +216,7 @@ async def answer_learning_quiz(
 async def answer_learning_practice(
     request: LearningPracticeAnswerRequest,
     raw_request: Request,
+    learner: LearnerContext = Depends(get_learner_context),
 ) -> LearningPracticeAnswerResponse:
     service: LearningService = raw_request.app.state.learning_service
 
@@ -233,7 +241,7 @@ async def answer_learning_practice(
     )
 
     adaptive_result = await service.answer_practice(
-        request.user_id,
+        learner.user_id,
         result,
         now=datetime.now(timezone.utc),
     )
@@ -284,6 +292,7 @@ async def get_learning_retest(
     "/quiz/retest",
     response_model=LearningRetestAnswerResponse,
     responses={
+        401: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
@@ -291,6 +300,7 @@ async def get_learning_retest(
 async def answer_learning_retest(
     request: LearningRetestAnswerRequest,
     raw_request: Request,
+    learner: LearnerContext = Depends(get_learner_context),
 ) -> LearningRetestAnswerResponse:
     service: LearningService = raw_request.app.state.learning_service
 
@@ -305,7 +315,7 @@ async def answer_learning_retest(
     )
 
     adaptive_result = await service.answer_retest(
-        request.user_id,
+        learner.user_id,
         result,
         now=datetime.now(timezone.utc),
     )

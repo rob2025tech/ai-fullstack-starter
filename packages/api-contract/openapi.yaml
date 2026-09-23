@@ -129,6 +129,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningStateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/InvalidRequest"
         "500":
@@ -152,6 +154,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningAnswerResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/InvalidRequest"
         "500":
@@ -202,6 +206,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningQuizAnswerResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/InvalidRequest"
         "500":
@@ -225,6 +231,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningPracticeAnswerResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/InvalidRequest"
         "500":
@@ -271,6 +279,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningRetestAnswerResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/InvalidRequest"
         "500":
@@ -290,6 +300,13 @@ components:
                 error:
                   code: invalid_request
                   message: "prompt must be a non-empty string"
+
+    Unauthorized:
+      description: Missing or invalid authentication credentials.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 
     RateLimited:
       description: Too many requests; retry later.
