@@ -15,8 +15,21 @@ info:
     - Nothing language-specific crosses the boundary: errors use the
       Error code registry, never exception class names or framework
       shapes.
-    - v1 has no authentication; user_id is an anonymous client-supplied
-      scope, not an identity.
+
+    Authentication:
+    - **Local development** (`deployment_mode: local`): the server runs
+      with no session secret; learner-state endpoints are accessible
+      without credentials.  This mode is intentional and must not be
+      promoted to shared or production deployments.
+    - **Shared-demo and production** (`deployment_mode: shared-demo` or
+      `production`): protected learning operations require a valid
+      session.  Browser clients authenticate via a signed session cookie
+      (`sessionCookie`); mobile clients authenticate via a bearer token
+      (`sessionBearer`).  Requests missing or supplying an invalid
+      credential receive HTTP 401 Unauthorized with an `unauthorized`
+      error code.
+    - `user_id` remains an anonymous scoping value (ADR-004) carried in
+      request bodies; it is not an identity claim.
 
 servers:
   - url: http://127.0.0.1:8000
@@ -109,6 +122,13 @@ paths:
       operationId: getLearningState
       tags: [learning]
       summary: Get learning state for a concept
+      description: |
+        Returns the current mastery and scheduling state for a learner/concept
+        pair. Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       parameters:
         - name: user_id
           in: query
@@ -141,6 +161,13 @@ paths:
       operationId: answerLearningQuestion
       tags: [learning]
       summary: Evaluate an answer and update learning state
+      description: |
+        Evaluates a free-form answer and updates the learner's mastery state.
+        Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -190,6 +217,13 @@ paths:
       operationId: answerLearningQuiz
       tags: [learning]
       summary: Evaluate a retention quiz answer
+      description: |
+        Evaluates a multiple-choice quiz answer and updates learner mastery.
+        Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -218,6 +252,14 @@ paths:
       operationId: answerLearningPractice
       tags: [learning]
       summary: Evaluate targeted practice after adaptive teaching
+      description: |
+        Evaluates the learner's response to a targeted practice question
+        generated after adaptive teaching.  Requires a valid session in
+        shared-demo and production deployments; accessible without credentials
+        in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -266,6 +308,13 @@ paths:
       operationId: answerLearningRetest
       tags: [learning]
       summary: Evaluate a retest answer and update mastery
+      description: |
+        Evaluates the learner's retest answer and updates mastery scheduling.
+        Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -307,6 +356,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missingSession:
+              value:
+                error:
+                  code: unauthorized
+                  message: "missing or invalid session"
 
     RateLimited:
       description: Too many requests; retry later.
@@ -335,6 +390,21 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: |
+        Signed session cookie issued by the backend on login.  Used by
+        browser clients.  The cookie name is `session`.
+    sessionBearer:
+      type: http
+      scheme: bearer
+      description: |
+        Signed session token carried as a Bearer token in the
+        Authorization header.  Used by mobile and non-browser clients.
 
   schemas:
     HealthResponse:
@@ -754,6 +824,7 @@ components:
           description: Stable, language-neutral error code registry.
           enum:
             - invalid_request
+            - unauthorized
             - rate_limited
             - provider_error
             - provider_unavailable
