@@ -91,3 +91,10 @@
 - **Files:** 1 (+104/-0)
 - **Duration:** 268ss
 - **Approach:** The learning router (backends/fastapi/app/routers/learning.py) already used LearnerContext.user_id for all three quiz mutation handlers (answer_learning_quiz, answer_learning_practice, answer_learning_retest) from prior WOs, and openapi.yaml already documented 401 + sessionCookie/sessionBearer security on all three endpoints. The test file existed but was missing: (1) the two-session isolation scenario proving learner_alpha's spoofed user_id cannot mutate learner_beta's state partition (AC-5), and (2) explicit protected-mode 401 envelope tests using a proper shared-demo TestClient (AC-7). Added _SECRET constant, _shared_demo_client() helper, one two-session cross-contamination test, and three 401 envelope tests to test_quiz_router.py.
+
+## WO-013: User Story: WO-013 - Remove retention quiz demo identity
+- **Status:** completed
+- **Commit:** `943ad52`
+- **Files:** 2 (+147/-5)
+- **Duration:** 188ss
+- **Approach:** Removed the hard-coded USER_ID constant and all three user_id properties from the RetentionQuiz component's API submission calls. The three call sites (answerLearningQuiz, answerLearningPractice, answerLearningRetest) now pass only concept and selected_answer, letting web/lib/api.ts own the session-credential transport. Created a source-inspection Vitest test file that reads the component source and asserts the absence of USER_ID, demo-student, and user_id properties in all three submission call objects. Included deterministic response fixture constants for all four response types (AC-5) without requiring any network access or DOM rendering.
