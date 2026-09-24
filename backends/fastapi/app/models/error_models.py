@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 ErrorCode = Literal[
     "invalid_request",
+    "unauthorized",
     "rate_limited",
     "internal_error",
     "provider_error",

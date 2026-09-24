@@ -1,0 +1,177 @@
+# Forge Implementation Log
+
+| Field | Value |
+|-------|-------|
+| Project | 0653a1ce-3efc-4826-a39d-8e06c6009a14 |
+| Branch | forge/ai-fullstack-starter-forge-b05-e04c329f-run2-25wo |
+| Started | 2026-09-23T23:04:34Z |
+
+---
+
+## WO-001: User Story: WO-001 - Add deployment-mode session settings
+- **Status:** completed
+- **Commit:** `a578c1a`
+- **Files:** 3 (+186/-2)
+- **Duration:** 160ss
+- **Approach:** Extended the existing pydantic-settings Settings class in-place to add session_issuer (default 'ai-fullstack-starter'), a positive-only session_ttl_seconds constraint via Annotated[int, Field(gt=0)], a model_validator that rejects blank/whitespace/missing session_secret in shared-demo and production modes, and a requires_session_auth() helper method. Created test_settings.py with a deterministic configuration matrix covering local/shared-demo/production modes, blank/whitespace/None secrets, unknown modes, and invalid TTL values.
+
+## WO-002: User Story: WO-002 - Secure learning operations in OpenAPI
+- **Status:** completed
+- **Commit:** `16d5952`
+- **Files:** 2 (+135/-2)
+- **Duration:** 209ss
+- **Approach:** Made additive changes to packages/api-contract/openapi.yaml in three layers: (1) updated info.description to document local no-secret vs shared-demo/production protected-mode authentication; (2) added components.securitySchemes with sessionCookie (apiKey/cookie/name:session) and sessionBearer (http/bearer), added 'unauthorized' to Error.code.enum, and added a missingSession example to the existing Unauthorized response component; (3) added security: [{sessionCookie:[]},{sessionBearer:[]}] requirements and operation-level descriptions on all five protected learning operations. Extended spec.test.ts with four new test cases covering securitySchemes structure, Unauthorized component schema ref, unauthorized error code membership, a loop over all five protected operations asserting both security array and 401 $ref, and a test confirming health/chat remain anonymous.
+
+## WO-003: User Story: WO-003 - Implement signed anonymous sessions
+- **Status:** completed
+- **Commit:** `fff2eb1`
+- **Files:** 5 (+377/-107)
+- **Duration:** 363ss
+- **Approach:** Rewrote the pre-existing hand-rolled HMAC sessions.py to use PyJWT 2.x (HS256) with the function and type names required by the work order: issue_anonymous_session, validate_session_token, SessionClaims, SessionValidationError. Added an injectable `now: int | None = None` parameter to both public functions so expiry tests can use a fixed timestamp without sleeping. When `now` is provided, PyJWT's built-in expiry check is disabled via options={'verify_exp': False} and a manual >= boundary check is performed instead. Updated dependencies.py to use the new names (validate_session_token, SessionValidationError, claims.sub). Added PyJWT>=2.9 to pyproject.toml. Created tests/auth/__init__.py and tests/auth/test_sessions.py with 17 deterministic test cases using a fixed timestamp (_NOW=1_700_000_000) and a placeholder secret.
+
+## WO-004: User Story: WO-004 - Regenerate contract security types
+- **Status:** completed
+- **Commit:** `cb36d4f`
+- **Files:** 2 (+647/-0)
+- **Duration:** 263ss
+- **Approach:** Ran openapi-typescript v7 (via npx since devDependencies were not installed) against packages/api-contract/openapi.yaml to regenerate packages/api-contract/src/generated/schema.ts. The generated file reflects all WO-002 security additions: the Unauthorized response component, the 'unauthorized' Error code enum value, and 401 response entries on all five protected learning operations. Updated .gitignore to add an exception (!packages/api-contract/src/generated/schema.ts) so the generated artifact is tracked on this branch per the WO edge-case requirement. packages/api-contract/src/index.ts was unchanged — it already re-exports the generated schema via 'export type * from ./generated/schema.js' and exports chatStreamEvents/ChatStreamEventName without modification.
+
+## WO-005: User Story: WO-005 - Make learning user_id non-authoritative
+- **Status:** completed
+- **Commit:** `8f7680d`
+- **Files:** 5 (+70/-16)
+- **Duration:** 327ss
+- **Approach:** Made user_id optional (str | None = None) on all four learning request models in learning_models.py. Updated openapi.yaml to remove user_id from required[] on the same four schemas to keep the FastAPI-emitted schema in sync with the canonical contract. Regenerated schema.ts via openapi-typescript v7. Fixed broken test imports (issue_session renamed to issue_anonymous_session in WO-003) in both test files. Added three new quiz tests covering requests that omit user_id entirely. The router already used learner.user_id from LearnerContext throughout — no router changes were needed.
+
+## WO-006: User Story: WO-006 - Document session bootstrap API contract
+- **Status:** completed
+- **Commit:** `9a2a1d6`
+- **Files:** 2 (+158/-0)
+- **Duration:** 188ss
+- **Approach:** Added POST /api/v1/session/bootstrap to openapi.yaml as a pure contract change. Defined SessionBootstrapRequest (transport enum: cookie, bearer; default cookie) and SessionBootstrapResponse (required: user_id, expires_at, token_type; access_token nullable/optional for cookie transport) as reusable components.schemas. The new path is unauthenticated (no security: requirement) and documents a Set-Cookie response header for browser clients and cookieClient/bearerClient examples using placeholder tokens only. Extended spec.test.ts with five targeted assertions covering all acceptance criteria. No TypeScript regeneration in this story per the constraint.
+
+## WO-007: User Story: WO-007 - Add learner context dependency
+- **Status:** completed
+- **Commit:** `208251e`
+- **Files:** 3 (+247/-40)
+- **Duration:** 239ss
+- **Approach:** Rewrote backends/fastapi/app/auth/dependencies.py to use FastAPI security primitives: APIKeyCookie(name='session', auto_error=False) for browser cookie transport and HTTPBearer(auto_error=False) for mobile bearer transport. Cookie takes documented precedence when both are supplied. Local mode without credentials returns LearnerContext(user_id='demo-student') deterministically. Protected modes (shared-demo, production) raise HTTP 401 when no valid credential is supplied. All token cryptography is delegated to validate_session_token in sessions.py. Fixed the broken test_auth_dependencies.py (used old issue_session name). Created tests/auth/test_dependencies.py with 11 targeted tests using minimal FastAPI TestClient routes.
+
+## WO-009: User Story: WO-009 - Add signed session bootstrap route
+- **Status:** completed
+- **Commit:** `e83bf08`
+- **Files:** 6 (+478/-1)
+- **Duration:** 365ss
+- **Approach:** Created app/models/session_models.py with SessionBootstrapRequest and SessionBootstrapResponse Pydantic models matching the existing OpenAPI schemas. Created app/routers/session.py with APIRouter(prefix='/api/v1', tags=['session']) implementing both POST /session (createSession) and POST /session/bootstrap (bootstrapSession) — both delegates to a shared _issue_bootstrap helper that generates an anonymous subject, issues a signed JWT via the existing issue_anonymous_session primitive, and returns the appropriate response for cookie or bearer transport. Wired session.router into main.py's create_app. Added POST /api/v1/session to openapi.yaml reusing existing SessionBootstrapRequest/SessionBootstrapResponse schemas. Regenerated schema.ts. Created tests/test_session_router.py with 12 deterministic tests using placeholder Settings fixtures.
+
+## WO-008: User Story: WO-008 - Make web learning fetches session-aware
+- **Status:** completed
+- **Commit:** `ad2eda8`
+- **Files:** 2 (+313/-29)
+- **Duration:** 529ss
+- **Approach:** Updated apps/web/lib/api.ts to add a shared jsonPost(body) helper that bakes in credentials: 'include' and explicit body construction. Each of the four mutation helpers (answerLearningQuestion, answerLearningQuiz, answerLearningPractice, answerLearningRetest) now builds its JSON body from concept/answer/selected_answer only — user_id is never serialized even if the caller passes it. Added getLearningState fetching state from /api/v1/learning/state with credentials: 'include' and no user_id query param. Created apps/web/lib/api.test.ts with vi.spyOn(globalThis, 'fetch') mocks asserting exact endpoint URLs, credentials: 'include', absent user_id in bodies/query strings, and deterministic response fixtures.
+
+## WO-010: User Story: WO-010 - Wire protected FastAPI startup policy
+- **Status:** completed
+- **Commit:** `55ab628`
+- **Files:** 4 (+182/-1)
+- **Duration:** 487ss
+- **Approach:** Made create_app the single operational control point for startup policy. Added UnauthorizedError(BackendError) to errors.py and 'unauthorized' to ErrorCode Literal in error_models.py (fixing the pre-existing drift test mismatch — canonical openapi.yaml already had 'unauthorized' in the enum). Updated main.py to: (1) set docs_url/redoc_url=None in protected modes (shared-demo, production) while keeping them for local, (2) change allow_credentials=False to True for credentialed cookie transport, (3) register a StarletteHTTPException handler that maps HTTP 401 to the contract error envelope {error: {code: 'unauthorized', message: '...'}} while delegating other HTTP exceptions to the standard response. Protected-mode startup failure is already enforced by the Settings pydantic model_validator. Created test_main_startup_policy.py with 11 tests covering all acceptance criteria.
+
+## WO-011: User Story: WO-011 - Derive identity for state and answers
+- **Status:** completed
+- **Commit:** `6529aa4`
+- **Files:** 1 (+76/-0)
+- **Duration:** 194ss
+- **Approach:** The learning router (backends/fastapi/app/routers/learning.py) already uses LearnerContext.user_id for both get_learning_state and answer_learning from prior WOs (WO-007/WO-010). The openapi.yaml already documents 401 + session security on both endpoints. The test file already had identity-isolation tests with JWT-signed fixtures. The only gap was AC-6: no test in test_learning_router.py verified that protected-mode (shared-demo) requests without credentials return 401 with the contract error envelope. Added _SECRET, _shared_demo_client() helper, and three new tests to test_learning_router.py covering the 401 envelope, answer-learning 401, and learner-alpha/learner-beta partition isolation in shared-demo mode.
+
+## WO-012: User Story: WO-012 - Derive identity for quiz mutations
+- **Status:** completed
+- **Commit:** `2f77101`
+- **Files:** 1 (+104/-0)
+- **Duration:** 268ss
+- **Approach:** The learning router (backends/fastapi/app/routers/learning.py) already used LearnerContext.user_id for all three quiz mutation handlers (answer_learning_quiz, answer_learning_practice, answer_learning_retest) from prior WOs, and openapi.yaml already documented 401 + sessionCookie/sessionBearer security on all three endpoints. The test file existed but was missing: (1) the two-session isolation scenario proving learner_alpha's spoofed user_id cannot mutate learner_beta's state partition (AC-5), and (2) explicit protected-mode 401 envelope tests using a proper shared-demo TestClient (AC-7). Added _SECRET constant, _shared_demo_client() helper, one two-session cross-contamination test, and three 401 envelope tests to test_quiz_router.py.
+
+## WO-013: User Story: WO-013 - Remove retention quiz demo identity
+- **Status:** completed
+- **Commit:** `943ad52`
+- **Files:** 2 (+147/-5)
+- **Duration:** 188ss
+- **Approach:** Removed the hard-coded USER_ID constant and all three user_id properties from the RetentionQuiz component's API submission calls. The three call sites (answerLearningQuiz, answerLearningPractice, answerLearningRetest) now pass only concept and selected_answer, letting web/lib/api.ts own the session-credential transport. Created a source-inspection Vitest test file that reads the component source and asserts the absence of USER_ID, demo-student, and user_id properties in all three submission call objects. Included deterministic response fixture constants for all four response types (AC-5) without requiring any network access or DOM rendering.
+
+## WO-014: User Story: WO-014 - Make adaptive tutor session-recoverable
+- **Status:** completed
+- **Commit:** `40e9927`
+- **Files:** 2 (+155/-4)
+- **Duration:** 353ss
+- **Approach:** Removed the hard-coded USER_ID constant and user_id from the answerLearningQuestion call in AdaptiveTutor. Added isUnauthorizedContractError predicate that checks instanceof ContractError && code === 'unauthorized'. Added sessionExpired boolean state; the catch block branches: unauthorized sets sessionExpired(true) without touching mastery/state/result, all other errors go to the existing setError path. Added amber recovery message rendered when sessionExpired is true. Cleared sessionExpired in retry() and at submitAnswer start. Created source inspection test file with fixtures for LearningStateResponse, LearningAnswerResponse, and a deterministic 401 ContractError fixture, plus tests verifying predicate existence, recovery message in source, and that the unauthorized branch never calls setState or setResult.
+
+## WO-015: User Story: WO-015 - Add mobile bearer session helpers
+- **Status:** completed
+- **Commit:** `5d559da`
+- **Files:** 2 (+189/-13)
+- **Duration:** 176ss
+- **Approach:** Added two type aliases (SessionBootstrapRequest, SessionBootstrapResponse) from the generated contract types to mobile/lib/api.ts. Added exported bootstrapSession() that always requests bearer transport via POST /api/v1/session/bootstrap and returns the typed response through the existing errorFromResponse error path. Added SendChatOptions interface with optional sessionToken field and updated sendChat() to accept it as an optional second argument, adding Authorization: Bearer <token> to fetch headers only when sessionToken is truthy (empty string is intentionally excluded). Existing sendChat callers with no options argument continue to work unchanged. Extended api.test.ts with deterministic fixtures for SessionBootstrapResponse and ChatResponse, bootstrapSession success/error/network-failure tests, four bearer-token sendChat tests covering with-token, stream:false-with-token, no-token, and empty-token cases, and two fixture shape tests.
+
+## WO-017: User Story: WO-017 - Refactor learning tests for session isolation
+- **Status:** completed
+- **Commit:** `31cddd7`
+- **Files:** 3 (+107/-0)
+- **Duration:** 232ss
+- **Approach:** Audited existing test files and identified that all session-derived identity assertions and 401 protected-mode tests were already in place from WO-011/WO-012. The two gaps were: (1) conftest.py lacked proper pytest fixtures for learner_alpha/beta and the shared_demo_client — tests used ad-hoc helper functions instead; (2) no test covered tampered/malformed JWT tokens. Added _SHARED_SECRET placeholder constant, KNOWN_CONCEPT constant, shared_demo_client fixture, learner_alpha_headers fixture, and learner_beta_headers fixture to conftest.py. Added test_tampered_bearer_token_returns_401_in_protected_mode to test_learning_router.py using the new fixtures. Added test_learner_alpha_answer_then_state_reflects_session_identity as the explicit AC-2 named learner-alpha flow (posts /answer then reads /state, asserts attempts incremented and user_id reflects session). Added test_tampered_bearer_token_returns_401_for_quiz_answer to test_quiz_router.py. All existing tests are preserved unchanged.
+
+## WO-020: User Story: WO-020 - Store mobile session for chat
+- **Status:** completed
+- **Commit:** `8963d57`
+- **Files:** 2 (+114/-3)
+- **Duration:** 209ss
+- **Approach:** Added useEffect to App.tsx's existing React imports and imported bootstrapSession alongside sendChat from ./lib/api. Added sessionTokenRef (useRef<string | null>(null)) to hold the bearer token for the app lifetime. Wired bootstrapSession() in a useEffect with empty deps array: on success stores session.access_token ?? null in the ref; on failure formats a ContractError message and sets the existing error state for the recoverable error display. Updated the sendChat call to pass ({ prompt: trimmed }, sessionTokenRef.current ? { sessionToken: sessionTokenRef.current } : undefined) — the request object stays prompt-only with no stream property, preserving ADR-006 JSON mode ownership in api.ts. The token is reused across all subsequent sends without re-bootstrapping. Created App.session.test.tsx using source inspection (same pattern as prior WOs) with BOOTSTRAP_RESPONSE_FIXTURE and CHAT_RESPONSE_FIXTURE constants.
+
+## WO-016: User Story: WO-016 - Test protected startup settings matrix
+- **Status:** completed
+- **Commit:** `5c6df9c`
+- **Files:** 1 (+132/-0)
+- **Duration:** 116ss
+- **Approach:** Inspected the existing Settings model_validator and create_app function. The validation is in Settings._require_secret_in_protected_modes (raises pydantic.ValidationError via ValueError for blank/missing session_secret in shared-demo or production modes). test_main_startup_policy.py from WO-010 already covered some startup behavior, but WO-016 explicitly requires a separate test_settings_startup_matrix.py. Created the file with three explicit named profiles: (1) local mode without secret — app constructs, health returns 200, no OPENAI_API_KEY needed; (2) shared-demo without secret — Settings raises ValidationError for None, whitespace, and empty-string secrets; production mode also tested; (3) shared-demo with valid placeholder secret — app constructs, health returns 200, unauthenticated learning returns 401. Validation failure occurs at Settings construction time (before create_app returns), which is the correct fail-closed boundary.
+
+## WO-018: User Story: WO-018 - Conform protected learning unauthorized responses
+- **Status:** completed
+- **Commit:** `aae4396`
+- **Files:** 1 (+76/-0)
+- **Duration:** 361ss
+- **Approach:** Audited all four target files before writing any code. openapi.yaml already has 401 + Unauthorized component on all 5 protected learning endpoints (from WO-002/WO-011/WO-012). spec.test.ts already validates the Unauthorized response component and security metadata on protected ops (from WO-002). learning.py already has 401: {model: ErrorResponse} in all 5 protected route decorators. test_contract_drift.py already checks status-code alignment per operation. The only missing piece was the live conformance tests for unauthenticated 401 behavior. Added 5 unauthenticated 401 conformance tests to conformance.test.ts — one per protected endpoint — each omitting all credentials and asserting HTTP 401 + assertErrorEnvelope(..., 'unauthorized'). Deterministic payloads use known concepts (additive-versioning, provider-fallback-pattern) and valid answers, confirming that even syntactically valid requests return 401 before domain validation (edge case from WO description).
+
+## WO-019: User Story: WO-019 - Fixture protected learning session tokens
+- **Status:** completed
+- **Commit:** `0294044`
+- **Files:** 3 (+197/-0)
+- **Duration:** 268ss
+- **Approach:** Identified the three missing fixture types (missing, tampered, expired) from conftest.py and the two missing expired-token test assertions from test_learning_router.py. Added missing_session_headers (returns {}), tampered_session_headers (issues a valid JWT then flips the last base64url character of the signature to guarantee post-signing corruption without producing an unparseable string), and expired_session_headers (issues a token with now=0 so exp=28800, expiry guaranteed since 1970 without wall-clock sleep). Added five fixture-parameterised tests to test_learning_router.py for GET /state and POST /answer covering all three invalid-session types. Added three fixture-parameterised tests to test_quiz_router.py for quiz/answer, quiz/practice, and quiz/retest using shared_demo_client + learner_alpha_headers, each asserting session-derived identity overrides a spoofed request-body user_id. All changes are additive — no existing tests were modified.
+
+## WO-021: User Story: WO-021 - Gate CI with protected auth profiles
+- **Status:** completed
+- **Commit:** `76e826f`
+- **Files:** 1 (+32/-6)
+- **Duration:** 203ss
+- **Approach:** Read the existing ci.yml (51 lines) to preserve all existing steps. Made three targeted changes to the fastapi job: (1) gave the existing pytest step an explicit name and added a second dedicated step running only test_settings_startup_matrix.py -q (AC-1); (2) added a shared-demo fail-closed gate that sets DEPLOYMENT_MODE=shared-demo via step env:, then runs Python -c to confirm Settings() raises a validation error — exits nonzero if it does not (AC-2); (3) replaced the old secretless conformance step with a protected-mode version that sets DEPLOYMENT_MODE=shared-demo and SESSION_SECRET=ci-only-test-placeholder-not-for-production-use via step env:, adds trap-based SERVER_PID cleanup on EXIT, adds a READY flag with an explicit health-readiness failure guard, and runs the CONTRACT_BASE_URL conformance command (AC-3/AC-4). All original ruff, pytest, npm generate, npm test, npm typecheck, and conformance commands remain present.
+
+## WO-022: User Story: WO-022 - Document client session transports
+- **Status:** completed
+- **Commit:** `3376d55`
+- **Files:** 2 (+145/-0)
+- **Duration:** 142ss
+- **Approach:** Read both existing READMEs in full to understand current content and locate natural insertion points. web/README.md had chat/SSE notes but nothing about cookie sessions or learning auth; mobile/README.md had strong Expo LAN + JSON-mode chat coverage but no bearer-token guidance. Added a 'Protected learning transport' section to each file covering exactly the ACs: web gets credentials:include, the no-user_id warning for retention-quiz and adaptive-tutor, and openapi.yaml reference; mobile gets bootstrapSession() usage, useRef storage (explicitly excluding AsyncStorage/SecureStore), Authorization header pattern with placeholder token, EXPO_PUBLIC_* secret exclusion, ADR-006 JSON-mode preservation note, and openapi.yaml reference. No code files were modified.
+
+## WO-023: User Story: WO-023 - Supersede no-auth ADR
+- **Status:** completed
+- **Commit:** `5a9853b`
+- **Files:** 3 (+154/-2)
+- **Duration:** 184ss
+- **Approach:** Read adr-004, the ADR README index, and adr-001 to understand the existing ADR style and the current no-auth status. Made three targeted changes: (1) changed adr-004 Status from Accepted to 'Superseded by ADR-007' with a direct relative link; (2) created adr-007 in the same ADR format (Status/Date/Supersedes/Context/Decision/Consequences/Migration waves) with all required content: deployment-mode table (local/shared-demo/production), FastAPI as the sole session authority referencing app/auth/sessions.py, web HttpOnly cookie transport via web/lib/api.ts, mobile bearer-token transport via mobile/lib/api.ts, fail-closed protected-mode rules, server-derived learner identity overriding client-supplied user_id, InMemoryLearningRepository as the current state store, six migration waves (Baseline→Backend guard→Protected route integration→Contract+client migration→Canary→Rollback), ADR-001/ADR-002/ADR-006 constraints; (3) updated README.md index to show ADR-004 as Superseded by ADR-007 and added ADR-007 as Accepted. No code files were modified.
+
+## WO-024: User Story: WO-024 - Document FastAPI protected deployment
+- **Status:** completed
+- **Commit:** `579272c`
+- **Files:** 1 (+138/-3)
+- **Duration:** 204ss
+- **Approach:** Read the existing fastapi/README.md (62 lines) and app/main.py to understand current content and the actual CORS and docs settings. Found that main.py already has allow_credentials=True and disables /docs and /redoc in protected modes — the README was simply missing operator documentation for these behaviours. Replaced the stale configuration section (which referenced 'ADR-004 no-auth; runs secretless') with an updated configuration table including the four auth-related settings, then appended five new operator-runbook sections: deployment-mode matrix, managed secrets, CORS credentials policy, endpoint exposure table, and interactive docs exposure rules. Also updated the contract obligations section to include the 401 behaviour. No Python files were modified.

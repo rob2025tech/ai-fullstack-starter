@@ -1,6 +1,6 @@
 # ADR-004: No authentication in v1
 
-- Status: Accepted
+- Status: Superseded by [ADR-007](adr-007-protected-learning-identity.md)
 - Date: 2026-08-31
 
 ## Context

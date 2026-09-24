@@ -1,139 +1,183 @@
-import base64
-import hashlib
-import hmac
-import json
+"""Signed anonymous session primitives for the FastAPI backend.
+
+Issues and validates compact JWTs (HS256) using configuration from
+:class:`app.config.settings.Settings`.  Framework-independent: can be
+exercised without a running FastAPI application.
+
+Exported surface
+----------------
+- :class:`SessionClaims`        — typed, trusted claim set
+- :class:`SessionValidationError` — raised on any invalid token
+- :func:`issue_anonymous_session` — produce a signed token
+- :func:`validate_session_token`  — verify and decode a token
+"""
+
+from __future__ import annotations
+
 import secrets
 import time
 from dataclasses import dataclass
-from typing import Final
+from typing import Any
+
+import jwt
+from jwt.exceptions import InvalidTokenError
 
 from app.config.settings import Settings
 
-SESSION_VERSION: Final = "v1"
-SESSION_ALGORITHM: Final = "HS256"
+_ALGORITHM = "HS256"
 
-_ephemeral_session_secret: str | None = None
+# Process-scoped ephemeral secret for local-mode convenience (never written to
+# disk or logs; regenerated on each process restart).
+_ephemeral_local_secret: str | None = None
 
 
-class SessionError(ValueError):
-    """Raised when a session token is invalid or cannot be issued."""
+class SessionValidationError(Exception):
+    """Raised when a session token cannot be issued or validated.
+
+    Intentionally carries no raw token, signature, or secret detail so it
+    is safe to propagate to an HTTP layer that surfaces the message.
+    """
 
 
 @dataclass(frozen=True)
-class Session:
-    user_id: str
-    expires_at: int
+class SessionClaims:
+    """Decoded, trusted claims extracted from a validated session token."""
+
+    sub: str
+    iss: str
+    iat: int
+    exp: int
 
 
-def _encode(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
-def _decode(value: str) -> bytes:
-    padding = "=" * (-len(value) % 4)
-    return base64.urlsafe_b64decode((value + padding).encode("ascii"))
-
-
-def _sign(signing_input: str, secret: str) -> str:
-    signature = hmac.new(
-        secret.encode("utf-8"),
-        signing_input.encode("ascii"),
-        hashlib.sha256,
-    ).digest()
-    return _encode(signature)
-
-
-def _get_signing_secret(settings: Settings) -> str:
-    global _ephemeral_session_secret
+def _resolve_secret(settings: Settings) -> str:
+    """Return the active signing secret, or raise :class:`SessionValidationError`."""
+    global _ephemeral_local_secret  # noqa: PLW0603
 
     if settings.session_secret:
         return settings.session_secret
 
     if settings.deployment_mode == "local":
-        if _ephemeral_session_secret is None:
-            _ephemeral_session_secret = secrets.token_urlsafe(32)
-        return _ephemeral_session_secret
+        # Generate a stable process-scoped secret so local tokens survive across
+        # multiple calls within the same process without requiring configuration.
+        if _ephemeral_local_secret is None:
+            _ephemeral_local_secret = secrets.token_urlsafe(32)
+        return _ephemeral_local_secret
 
-    raise SessionError(
-        "SESSION_SECRET must be configured for shared-demo or production"
+    raise SessionValidationError(
+        "session_secret must be configured for non-local deployments"
     )
 
 
-def validate_session_configuration(settings: Settings) -> None:
-    if settings.session_ttl_seconds <= 0:
-        raise SessionError("session_ttl_seconds must be greater than zero")
-
-    if settings.deployment_mode != "local" and not settings.session_secret:
-        raise SessionError(
-            "SESSION_SECRET must be configured for shared-demo or production"
-        )
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 
-def issue_session(settings: Settings, user_id: str) -> str:
-    if not user_id:
-        raise SessionError("user_id must not be empty")
+def issue_anonymous_session(
+    settings: Settings,
+    subject: str,
+    *,
+    now: int | None = None,
+) -> str:
+    """Issue a signed anonymous session token for a learner subject.
 
-    validate_session_configuration(settings)
+    Args:
+        settings: Application settings providing secret, issuer, and TTL.
+        subject: Learner identifier embedded as the ``sub`` JWT claim.
+        now: Optional Unix timestamp to use as the issuance time.  When
+            omitted the real system clock is used.  Inject a fixed value
+            in unit tests to produce deterministic tokens.
 
-    now = int(time.time())
-    expires_at = now + settings.session_ttl_seconds
+    Returns:
+        A compact JWT string (``header.payload.signature``).
 
-    payload = {
-        "ver": SESSION_VERSION,
-        "sub": user_id,
+    Raises:
+        :class:`SessionValidationError`: If *subject* is empty or blank,
+            or if no signing secret is available.
+    """
+    if not subject or not subject.strip():
+        raise SessionValidationError("subject must not be empty")
+
+    secret = _resolve_secret(settings)
+
+    if now is None:
+        now = int(time.time())
+
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "iss": settings.session_issuer,
         "iat": now,
-        "exp": expires_at,
+        "exp": now + settings.session_ttl_seconds,
     }
 
-    payload_bytes = json.dumps(
-        payload,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-
-    encoded_payload = _encode(payload_bytes)
-    signing_input = f"{SESSION_VERSION}.{encoded_payload}"
-    signature = _sign(signing_input, _get_signing_secret(settings))
-
-    return f"{signing_input}.{signature}"
+    return jwt.encode(payload, secret, algorithm=_ALGORITHM)
 
 
-def validate_session(settings: Settings, token: str) -> Session:
-    validate_session_configuration(settings)
+def validate_session_token(
+    settings: Settings,
+    token: str,
+    *,
+    now: int | None = None,
+) -> SessionClaims:
+    """Validate a signed session token and return trusted claims.
 
-    parts = token.split(".")
-    if len(parts) != 3:
-        raise SessionError("Malformed session token")
+    Args:
+        settings: Application settings providing secret and issuer.
+        token: Compact JWT string to validate.
+        now: Optional Unix timestamp to use when checking expiry.  When
+            provided, PyJWT's built-in clock is bypassed and this value is
+            used instead.  Inject a fixed value in unit tests to control
+            expiry boundaries without sleeping.
 
-    version, encoded_payload, provided_signature = parts
+    Returns:
+        A :class:`SessionClaims` instance with decoded, trusted claims.
 
-    if version != SESSION_VERSION:
-        raise SessionError("Unsupported session token version")
+    Raises:
+        :class:`SessionValidationError`: For expired, tampered, malformed,
+            wrong-issuer, or missing-subject tokens, or when no signing
+            secret is available.
+    """
+    secret = _resolve_secret(settings)
 
-    signing_input = f"{version}.{encoded_payload}"
-    expected_signature = _sign(signing_input, _get_signing_secret(settings))
-
-    if not hmac.compare_digest(provided_signature, expected_signature):
-        raise SessionError("Invalid session signature")
+    # When a custom ``now`` is injected, disable PyJWT's built-in expiry check
+    # so we can perform the boundary comparison with the provided timestamp.
+    decode_options: dict[str, Any] = {}
+    if now is not None:
+        decode_options["verify_exp"] = False
 
     try:
-        payload = json.loads(_decode(encoded_payload))
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SessionError("Malformed session payload") from exc
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=[_ALGORITHM],
+            issuer=settings.session_issuer,
+            options=decode_options,
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise SessionValidationError("session token has expired") from exc
+    except jwt.InvalidIssuerError as exc:
+        raise SessionValidationError("session token issuer mismatch") from exc
+    except InvalidTokenError as exc:
+        raise SessionValidationError("invalid session token") from exc
 
-    if payload.get("ver") != SESSION_VERSION:
-        raise SessionError("Invalid session version")
+    # Manual expiry check when a custom ``now`` is provided.
+    if now is not None:
+        exp = payload.get("exp")
+        if not isinstance(exp, int) or now >= exp:
+            raise SessionValidationError("session token has expired")
 
-    user_id = payload.get("sub")
-    expires_at = payload.get("exp")
+    sub = payload.get("sub")
+    if not isinstance(sub, str) or not sub:
+        raise SessionValidationError("session token missing or empty subject")
 
-    if not isinstance(user_id, str) or not user_id:
-        raise SessionError("Invalid session subject")
-
-    if not isinstance(expires_at, int):
-        raise SessionError("Invalid session expiration")
-
-    if expires_at <= int(time.time()):
-        raise SessionError("Session expired")
-
-    return Session(user_id=user_id, expires_at=expires_at)
+    return SessionClaims(
+        sub=sub,
+        iss=str(payload.get("iss", "")),
+        iat=int(payload.get("iat", 0)),
+        exp=int(payload.get("exp", 0)),
+    )

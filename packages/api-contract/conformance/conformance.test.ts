@@ -136,4 +136,80 @@ describe(`API contract conformance @ ${BASE_URL}`, () => {
     expect(response.headers.get("content-type")).toContain("application/json");
     assertErrorEnvelope(await response.json(), "invalid_request");
   });
+
+  // ---------------------------------------------------------------------------
+  // Protected learning endpoints — 401 conformance (AC-3, AC-4).
+  // These tests require a protected-mode backend
+  // (deployment_mode: shared-demo or production).  They assert that
+  // unauthenticated requests receive a contract-shaped 401 envelope rather
+  // than a FastAPI default detail payload or a 200 with demo state.
+  // ---------------------------------------------------------------------------
+
+  it("GET /api/v1/learning/state without credentials returns 401 and unauthorized envelope", async () => {
+    const response = await fetch(
+      `${BASE_URL}/api/v1/learning/state?concept=additive-versioning`,
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    assertErrorEnvelope(await response.json(), "unauthorized");
+  });
+
+  it("POST /api/v1/learning/answer without credentials returns 401 and unauthorized envelope", async () => {
+    const response = await fetch(`${BASE_URL}/api/v1/learning/answer`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        concept: "additive-versioning",
+        answer: "Adding a new optional field to a response",
+      }),
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    assertErrorEnvelope(await response.json(), "unauthorized");
+  });
+
+  it("POST /api/v1/learning/quiz/answer without credentials returns 401 and unauthorized envelope", async () => {
+    const response = await fetch(`${BASE_URL}/api/v1/learning/quiz/answer`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        concept: "provider-fallback-pattern",
+        selected_answer:
+          "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+      }),
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    assertErrorEnvelope(await response.json(), "unauthorized");
+  });
+
+  it("POST /api/v1/learning/quiz/practice without credentials returns 401 and unauthorized envelope", async () => {
+    const response = await fetch(`${BASE_URL}/api/v1/learning/quiz/practice`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        concept: "provider-fallback-pattern",
+        selected_answer:
+          "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+      }),
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    assertErrorEnvelope(await response.json(), "unauthorized");
+  });
+
+  it("POST /api/v1/learning/quiz/retest without credentials returns 401 and unauthorized envelope", async () => {
+    const response = await fetch(`${BASE_URL}/api/v1/learning/quiz/retest`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        concept: "additive-versioning",
+        selected_answer:
+          "Add the new field without removing or changing existing fields",
+      }),
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    assertErrorEnvelope(await response.json(), "unauthorized");
+  });
 });

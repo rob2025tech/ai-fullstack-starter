@@ -2,13 +2,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config.settings import Settings, settings
 from app.core.errors import BackendError
 from app.learning.repository import InMemoryLearningRepository
 from app.models.error_models import Error, ErrorResponse
 from app.providers.llm.registry import build_llm_provider
-from app.routers import chat, health, learning
+from app.routers import chat, health, learning, session
 from app.learning.service import LearningService
 from app.services.chat_service import ChatService
 from app.services.teaching_service import TeachingService
@@ -20,16 +21,22 @@ def _error_body(code: str, message: str) -> dict:
 
 def create_app(app_settings: Settings | None = None) -> FastAPI:
     app_settings = app_settings or settings
+
+    # Protected modes disable interactive docs; OpenAPI schema generation remains
+    # available via the Python API for drift tests.
+    _protected = app_settings.requires_session_auth()
     app = FastAPI(
         title="AI Fullstack Starter API",
         version=app_settings.contract_version,
         description="Reference implementation of the /api/v1 contract.",
+        docs_url=None if _protected else "/docs",
+        redoc_url=None if _protected else "/redoc",
     )
     app.state.settings = app_settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
-        allow_credentials=False,
+        allow_credentials=True,
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
@@ -44,7 +51,17 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(session.router)
     app.include_router(learning.router)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        if exc.status_code == 401:
+            return JSONResponse(
+                status_code=401,
+                content=_error_body("unauthorized", "session authentication required"),
+            )
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

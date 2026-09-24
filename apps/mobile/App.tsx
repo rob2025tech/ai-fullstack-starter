@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 
-import { ContractError, sendChat } from "./lib/api";
+import { ContractError, bootstrapSession, sendChat } from "./lib/api";
 
 interface Message {
   id: string;
@@ -31,6 +31,21 @@ export default function App() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    bootstrapSession()
+      .then((session) => {
+        sessionTokenRef.current = session.access_token ?? null;
+      })
+      .catch((err: unknown) => {
+        const contract =
+          err instanceof ContractError
+            ? `${err.code}: ${err.message}`
+            : "internal_error: session setup failed";
+        setError(contract);
+      });
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
@@ -41,7 +56,10 @@ export default function App() {
     const placeholder = makeMessage("assistant", "");
     setMessages((prev) => [...prev, makeMessage("user", trimmed), placeholder]);
     try {
-      const response = await sendChat({ prompt: trimmed });
+      const response = await sendChat(
+        { prompt: trimmed },
+        sessionTokenRef.current ? { sessionToken: sessionTokenRef.current } : undefined,
+      );
       setMessages((prev) =>
         prev.map((message) =>
           message.id === placeholder.id

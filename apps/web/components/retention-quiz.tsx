@@ -12,8 +12,6 @@ import {
   getLearningRetest,
 } from "@/lib/api";
 
-const USER_ID = "demo-student";
-
 const QUIZ_CONCEPTS = [
   "additive-versioning",
   "contract-first-design",
@@ -133,7 +131,6 @@ export default function RetentionQuiz() {
 
     try {
       const answer = await answerLearningQuiz({
-        user_id: USER_ID,
         concept: question.concept,
         selected_answer: selectedAnswer,
       });
@@ -166,7 +163,6 @@ export default function RetentionQuiz() {
 
     try {
       const practiceAnswer = await answerLearningPractice({
-        user_id: USER_ID,
         concept,
         selected_answer: practiceSelectedAnswer,
       });
@@ -217,7 +213,6 @@ export default function RetentionQuiz() {
 
     try {
       const answer = await answerLearningRetest({
-        user_id: USER_ID,
         concept: retestQuestion.concept,
         selected_answer: retestSelectedAnswer,
       });

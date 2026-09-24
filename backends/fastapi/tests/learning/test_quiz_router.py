@@ -1,8 +1,12 @@
-from app.auth.sessions import issue_session
+from app.auth.sessions import issue_anonymous_session
+from app.config.settings import Settings
 from app.learning.repository import InMemoryLearningRepository
 from app.learning.service import LearningService
 from app.main import create_app
 from fastapi.testclient import TestClient
+
+# Placeholder secret for deterministic shared-demo fixtures (AC-6)
+_SECRET = "test-quiz-router-secret-minimum-32bytes"
 
 
 def make_client() -> TestClient:
@@ -13,8 +17,20 @@ def make_client() -> TestClient:
     return TestClient(app)
 
 
+def _shared_demo_client() -> TestClient:
+    """TestClient with shared-demo Settings and a fresh in-memory repo (AC-7)."""
+    app = create_app(
+        Settings(
+            _env_file=None,
+            deployment_mode="shared-demo",
+            session_secret=_SECRET,
+        )
+    )
+    return TestClient(app)
+
+
 def auth_headers(client: TestClient, user_id: str) -> dict[str, str]:
-    token = issue_session(
+    token = issue_anonymous_session(
         client.app.state.settings,
         user_id,
     )
@@ -245,3 +261,227 @@ def test_answer_learning_retest_uses_authenticated_identity() -> None:
     body = response.json()
 
     assert body["user_id"] == "quiz-student"
+
+
+def test_answer_learning_quiz_without_user_id_uses_trusted_identity() -> None:
+    client = make_client()
+    headers = auth_headers(client, "learner-a")
+
+    response = client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["user_id"] == "learner-a"
+    assert body["is_correct"] is True
+
+
+def test_answer_learning_practice_without_user_id_uses_trusted_identity() -> None:
+    client = make_client()
+    headers = auth_headers(client, "learner-a")
+
+    response = client.post(
+        "/api/v1/learning/quiz/practice",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "anything",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["user_id"] == "learner-a"
+
+
+def test_answer_learning_retest_without_user_id_uses_trusted_identity() -> None:
+    client = make_client()
+    headers = auth_headers(client, "learner-b")
+
+    response = client.post(
+        "/api/v1/learning/quiz/retest",
+        json={
+            "concept": "additive-versioning",
+            "selected_answer": "Add the new field without removing or changing existing fields",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["user_id"] == "learner-b"
+
+
+# ---------------------------------------------------------------------------
+# AC-5: Two-session isolation — learner_alpha spoofing learner_beta's user_id
+# must not mutate learner_beta's state partition
+# ---------------------------------------------------------------------------
+
+
+def test_quiz_answer_alpha_cannot_mutate_beta_state() -> None:
+    """learner_alpha sends user_id=learner_beta but beta's state is unaffected (AC-5)."""
+    client = _shared_demo_client()
+
+    alpha_headers = auth_headers(client, "learner-alpha")
+    beta_headers = auth_headers(client, "learner-beta")
+
+    # Capture learner-beta's initial state
+    beta_initial = client.get(
+        "/api/v1/learning/state",
+        params={"concept": "provider-fallback-pattern"},
+        headers=beta_headers,
+    )
+    assert beta_initial.status_code == 200
+    beta_initial_attempts = beta_initial.json()["attempts"]
+
+    # learner-alpha submits quiz/answer but spoofs user_id as learner-beta
+    alpha_response = client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "user_id": "learner-beta",  # spoofed — must be ignored
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers=alpha_headers,
+    )
+    assert alpha_response.status_code == 200
+    # Response user_id reflects alpha's session, not the spoofed beta
+    assert alpha_response.json()["user_id"] == "learner-alpha"
+
+    # learner-beta's state must be unchanged
+    beta_after = client.get(
+        "/api/v1/learning/state",
+        params={"concept": "provider-fallback-pattern"},
+        headers=beta_headers,
+    )
+    assert beta_after.status_code == 200
+    assert beta_after.json()["attempts"] == beta_initial_attempts
+
+
+# ---------------------------------------------------------------------------
+# AC-7: Protected mode — all three quiz mutation endpoints return 401 with
+# the contract envelope when no session is provided
+# ---------------------------------------------------------------------------
+
+
+def test_tampered_bearer_token_returns_401_for_quiz_answer() -> None:
+    """A tampered JWT is rejected with 401 on quiz/answer in protected mode (AC-4, AC-6)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers={"Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhdHRhY2tlciJ9.tampered-sig"},
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_quiz_answer_without_session_returns_401_in_protected_mode() -> None:
+    """POST /api/v1/learning/quiz/answer returns 401 envelope without session (AC-7)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_quiz_practice_without_session_returns_401_in_protected_mode() -> None:
+    """POST /api/v1/learning/quiz/practice returns 401 envelope without session (AC-7)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/quiz/practice",
+        json={"concept": "provider-fallback-pattern", "selected_answer": "anything"},
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_quiz_retest_without_session_returns_401_in_protected_mode() -> None:
+    """POST /api/v1/learning/quiz/retest returns 401 envelope without session (AC-7)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/quiz/retest",
+        json={"concept": "additive-versioning", "selected_answer": "anything"},
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+# ---------------------------------------------------------------------------
+# AC-3, AC-4: Centralised valid-session fixture tests for all three quiz
+# mutation endpoints — exercises conftest.py shared_demo_client and
+# learner_alpha_headers fixtures and asserts session-derived identity.
+# ---------------------------------------------------------------------------
+
+
+def test_quiz_answer_with_valid_session_fixture_uses_token_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """POST /api/v1/learning/quiz/answer with learner_alpha_headers returns 200
+    and response user_id reflects the signed session subject, not the
+    request body (AC-3, AC-4)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "user_id": "attacker-id",  # spoofed — must be overridden by session
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers=learner_alpha_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["user_id"] == "learner-alpha"
+
+
+def test_quiz_practice_with_valid_session_fixture_uses_token_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """POST /api/v1/learning/quiz/practice with learner_alpha_headers returns 200
+    and response user_id reflects the signed session subject (AC-3)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/quiz/practice",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "anything",
+        },
+        headers=learner_alpha_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["user_id"] == "learner-alpha"
+
+
+def test_quiz_retest_with_valid_session_fixture_uses_token_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """POST /api/v1/learning/quiz/retest with learner_alpha_headers returns 200
+    and response user_id reflects the signed session subject (AC-3)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/quiz/retest",
+        json={
+            "concept": "additive-versioning",
+            "selected_answer": "Add the new field without removing or changing existing fields",
+        },
+        headers=learner_alpha_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["user_id"] == "learner-alpha"

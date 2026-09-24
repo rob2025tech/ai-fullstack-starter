@@ -15,8 +15,21 @@ info:
     - Nothing language-specific crosses the boundary: errors use the
       Error code registry, never exception class names or framework
       shapes.
-    - v1 has no authentication; user_id is an anonymous client-supplied
-      scope, not an identity.
+
+    Authentication:
+    - **Local development** (`deployment_mode: local`): the server runs
+      with no session secret; learner-state endpoints are accessible
+      without credentials.  This mode is intentional and must not be
+      promoted to shared or production deployments.
+    - **Shared-demo and production** (`deployment_mode: shared-demo` or
+      `production`): protected learning operations require a valid
+      session.  Browser clients authenticate via a signed session cookie
+      (`sessionCookie`); mobile clients authenticate via a bearer token
+      (`sessionBearer`).  Requests missing or supplying an invalid
+      credential receive HTTP 401 Unauthorized with an `unauthorized`
+      error code.
+    - `user_id` remains an anonymous scoping value (ADR-004) carried in
+      request bodies; it is not an identity claim.
 
 servers:
   - url: http://127.0.0.1:8000
@@ -29,6 +42,8 @@ tags:
     description: Prompt in, completion out
   - name: learning
     description: Adaptive learning state and answer evaluation
+  - name: session
+    description: Anonymous session bootstrap
 
 paths:
   /api/v1/health:
@@ -104,11 +119,135 @@ paths:
         "503":
           $ref: "#/components/responses/ProviderUnavailable"
 
+  /api/v1/session:
+    post:
+      operationId: createSession
+      tags: [session]
+      summary: Issue an anonymous learner session
+      description: |
+        Issues a signed, expiring anonymous learner session for browser
+        (cookie) or mobile (bearer) clients.  No prior credentials are
+        required.  The session scopes a single anonymous learner for the
+        server-configured TTL.  Bearer token values in examples are
+        placeholders only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionBootstrapRequest"
+            examples:
+              cookieClient:
+                value:
+                  transport: cookie
+              bearerClient:
+                value:
+                  transport: bearer
+      responses:
+        "200":
+          description: Session issued successfully.
+          headers:
+            Set-Cookie:
+              description: |
+                Signed session cookie for browser clients when transport
+                is `cookie`.  The cookie name is `session`, HttpOnly,
+                and scoped to the API origin.
+              schema:
+                type: string
+              example: "session=<signed-demo-token>; HttpOnly; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionBootstrapResponse"
+              examples:
+                cookieClient:
+                  value:
+                    user_id: "anon-abc12345"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: cookie
+                    access_token: null
+                bearerClient:
+                  value:
+                    user_id: "anon-abc12345"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: bearer
+                    access_token: "<signed-demo-token>"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/session/bootstrap:
+    post:
+      operationId: bootstrapSession
+      tags: [session]
+      summary: Bootstrap an anonymous session
+      description: |
+        Issues an anonymous session for browser (cookie) or mobile
+        (bearer) clients.  This endpoint requires no prior credentials;
+        it is the entry point for protected learning sessions.  The
+        returned session scopes a single anonymous learner for the
+        server-configured TTL.  Bearer token values in examples are
+        placeholders only and must never contain real secrets.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionBootstrapRequest"
+            examples:
+              cookieClient:
+                value:
+                  transport: cookie
+              bearerClient:
+                value:
+                  transport: bearer
+      responses:
+        "200":
+          description: Session bootstrapped successfully.
+          headers:
+            Set-Cookie:
+              description: |
+                Signed session cookie set for browser clients when
+                transport is `cookie`.  The cookie name is `session`,
+                HttpOnly, and scoped to the API origin.
+              schema:
+                type: string
+              example: "session=<signed-demo-token>; HttpOnly; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionBootstrapResponse"
+              examples:
+                cookieClient:
+                  value:
+                    user_id: "anon-demo-abc123"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: cookie
+                    access_token: null
+                bearerClient:
+                  value:
+                    user_id: "anon-demo-abc123"
+                    expires_at: "2026-09-24T08:00:00Z"
+                    token_type: bearer
+                    access_token: "<signed-demo-token>"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/learning/state:
     get:
       operationId: getLearningState
       tags: [learning]
       summary: Get learning state for a concept
+      description: |
+        Returns the current mastery and scheduling state for a learner/concept
+        pair. Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       parameters:
         - name: user_id
           in: query
@@ -141,6 +280,13 @@ paths:
       operationId: answerLearningQuestion
       tags: [learning]
       summary: Evaluate an answer and update learning state
+      description: |
+        Evaluates a free-form answer and updates the learner's mastery state.
+        Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -190,6 +336,13 @@ paths:
       operationId: answerLearningQuiz
       tags: [learning]
       summary: Evaluate a retention quiz answer
+      description: |
+        Evaluates a multiple-choice quiz answer and updates learner mastery.
+        Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -218,6 +371,14 @@ paths:
       operationId: answerLearningPractice
       tags: [learning]
       summary: Evaluate targeted practice after adaptive teaching
+      description: |
+        Evaluates the learner's response to a targeted practice question
+        generated after adaptive teaching.  Requires a valid session in
+        shared-demo and production deployments; accessible without credentials
+        in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -266,6 +427,13 @@ paths:
       operationId: answerLearningRetest
       tags: [learning]
       summary: Evaluate a retest answer and update mastery
+      description: |
+        Evaluates the learner's retest answer and updates mastery scheduling.
+        Requires a valid session in shared-demo and production deployments;
+        accessible without credentials in local development mode.
+      security:
+        - sessionCookie: []
+        - sessionBearer: []
       requestBody:
         required: true
         content:
@@ -307,6 +475,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missingSession:
+              value:
+                error:
+                  code: unauthorized
+                  message: "missing or invalid session"
 
     RateLimited:
       description: Too many requests; retry later.
@@ -335,6 +509,21 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: |
+        Signed session cookie issued by the backend on login.  Used by
+        browser clients.  The cookie name is `session`.
+    sessionBearer:
+      type: http
+      scheme: bearer
+      description: |
+        Signed session token carried as a Bearer token in the
+        Authorization header.  Used by mobile and non-browser clients.
 
   schemas:
     HealthResponse:
@@ -432,7 +621,6 @@ components:
     LearningAnswerRequest:
       type: object
       required:
-        - user_id
         - concept
         - answer
       properties:
@@ -531,7 +719,6 @@ components:
     LearningQuizAnswerRequest:
       type: object
       required:
-        - user_id
         - concept
         - selected_answer
       properties:
@@ -600,7 +787,6 @@ components:
     LearningPracticeAnswerRequest:
       type: object
       required:
-        - user_id
         - concept
         - selected_answer
       properties:
@@ -687,7 +873,6 @@ components:
     LearningRetestAnswerRequest:
       type: object
       required:
-        - user_id
         - concept
         - selected_answer
       properties:
@@ -754,6 +939,7 @@ components:
           description: Stable, language-neutral error code registry.
           enum:
             - invalid_request
+            - unauthorized
             - rate_limited
             - provider_error
             - provider_unavailable
@@ -779,3 +965,43 @@ components:
       properties:
         content:
           type: string
+
+    SessionBootstrapRequest:
+      type: object
+      properties:
+        transport:
+          type: string
+          enum: [cookie, bearer]
+          default: cookie
+          description: |
+            Transport mode for the issued session.  `cookie` is the
+            browser-preferred transport; the server sets an HttpOnly
+            session cookie in the Set-Cookie response header.  `bearer`
+            is the mobile-preferred transport; the server returns
+            `access_token` in the JSON body for use as an
+            Authorization: Bearer token on protected requests.
+
+    SessionBootstrapResponse:
+      type: object
+      required:
+        - user_id
+        - expires_at
+        - token_type
+      properties:
+        user_id:
+          type: string
+          description: Server-assigned anonymous learner identifier for this session.
+        expires_at:
+          type: string
+          format: date-time
+          description: ISO 8601 datetime when this session expires.
+        token_type:
+          type: string
+          enum: [cookie, bearer]
+          description: Transport type that was issued.
+        access_token:
+          type: [string, "null"]
+          description: |
+            Signed session token for bearer transport.  Null or absent
+            for cookie transport.  Carry in the Authorization header as
+            `Bearer <access_token>` on subsequent protected requests.

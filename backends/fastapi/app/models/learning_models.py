@@ -14,7 +14,7 @@ class LearningStateResponse(BaseModel):
 
 
 class LearningAnswerRequest(BaseModel):
-    user_id: str = Field(min_length=1)
+    user_id: str | None = None
     concept: str = Field(min_length=1)
     answer: str = Field(min_length=1)
 
@@ -46,7 +46,7 @@ class LearningQuizResponse(BaseModel):
 
 
 class LearningQuizAnswerRequest(BaseModel):
-    user_id: str = Field(min_length=1)
+    user_id: str | None = None
     concept: str = Field(min_length=1)
     selected_answer: str = Field(min_length=1)
 
@@ -69,7 +69,7 @@ class LearningQuizAnswerResponse(BaseModel):
 
 
 class LearningPracticeAnswerRequest(BaseModel):
-    user_id: str = Field(min_length=1)
+    user_id: str | None = None
     concept: str = Field(min_length=1)
     selected_answer: str = Field(min_length=1)
 
@@ -96,7 +96,7 @@ class LearningRetestResponse(BaseModel):
 
 
 class LearningRetestAnswerRequest(BaseModel):
-    user_id: str = Field(min_length=1)
+    user_id: str | None = None
     concept: str = Field(min_length=1)
     selected_answer: str = Field(min_length=1)
 
