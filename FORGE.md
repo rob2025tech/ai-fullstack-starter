@@ -147,3 +147,10 @@
 - **Files:** 3 (+197/-0)
 - **Duration:** 268ss
 - **Approach:** Identified the three missing fixture types (missing, tampered, expired) from conftest.py and the two missing expired-token test assertions from test_learning_router.py. Added missing_session_headers (returns {}), tampered_session_headers (issues a valid JWT then flips the last base64url character of the signature to guarantee post-signing corruption without producing an unparseable string), and expired_session_headers (issues a token with now=0 so exp=28800, expiry guaranteed since 1970 without wall-clock sleep). Added five fixture-parameterised tests to test_learning_router.py for GET /state and POST /answer covering all three invalid-session types. Added three fixture-parameterised tests to test_quiz_router.py for quiz/answer, quiz/practice, and quiz/retest using shared_demo_client + learner_alpha_headers, each asserting session-derived identity overrides a spoofed request-body user_id. All changes are additive — no existing tests were modified.
+
+## WO-021: User Story: WO-021 - Gate CI with protected auth profiles
+- **Status:** completed
+- **Commit:** `76e826f`
+- **Files:** 1 (+32/-6)
+- **Duration:** 203ss
+- **Approach:** Read the existing ci.yml (51 lines) to preserve all existing steps. Made three targeted changes to the fastapi job: (1) gave the existing pytest step an explicit name and added a second dedicated step running only test_settings_startup_matrix.py -q (AC-1); (2) added a shared-demo fail-closed gate that sets DEPLOYMENT_MODE=shared-demo via step env:, then runs Python -c to confirm Settings() raises a validation error — exits nonzero if it does not (AC-2); (3) replaced the old secretless conformance step with a protected-mode version that sets DEPLOYMENT_MODE=shared-demo and SESSION_SECRET=ci-only-test-placeholder-not-for-production-use via step env:, adds trap-based SERVER_PID cleanup on EXIT, adds a READY flag with an explicit health-readiness failure guard, and runs the CONTRACT_BASE_URL conformance command (AC-3/AC-4). All original ruff, pytest, npm generate, npm test, npm typecheck, and conformance commands remain present.

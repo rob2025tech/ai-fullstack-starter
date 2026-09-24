@@ -31,20 +31,46 @@ jobs:
       - run: python -m venv backends/fastapi/.venv
       - run: backends/fastapi/.venv/bin/pip install -r backends/fastapi/requirements-lock.txt
       - run: backends/fastapi/.venv/bin/ruff check backends/fastapi
-      - run: backends/fastapi/.venv/bin/pytest
+      - name: Run full FastAPI test suite (includes protected session fixture coverage)
+        run: .venv/bin/pytest -q
         working-directory: backends/fastapi
+      - name: Run FastAPI startup settings matrix tests
+        run: .venv/bin/pytest tests/test_settings_startup_matrix.py -q
+        working-directory: backends/fastapi
+      - name: Verify shared-demo startup without session secret fails closed
+        working-directory: backends/fastapi
+        env:
+          DEPLOYMENT_MODE: shared-demo
+        run: |
+          .venv/bin/python -c "
+          import sys
+          from app.config.settings import Settings
+          try:
+              Settings(_env_file=None)
+              print('ERROR: shared-demo startup without signing secret must fail', file=sys.stderr)
+              sys.exit(1)
+          except Exception as e:
+              print(f'OK: startup correctly rejected: {e}')
+              sys.exit(0)
+          "
       - run: npm ci
-      - name: Run contract conformance against the live backend
+      - name: Run contract conformance against the protected-mode backend
+        env:
+          DEPLOYMENT_MODE: shared-demo
+          SESSION_SECRET: ci-only-test-placeholder-not-for-production-use
         run: |
           cd backends/fastapi
           .venv/bin/uvicorn app.main:app --port 8000 &
           SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null' EXIT
+          READY=0
           for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null && break
+            curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null && READY=1 && break
             sleep 1
           done
+          if [ "$READY" -eq 0 ]; then
+            echo "Backend did not become healthy within 30 seconds" >&2
+            exit 1
+          fi
           cd "$GITHUB_WORKSPACE"
           CONTRACT_BASE_URL=http://127.0.0.1:8000 npm run test:conformance -w @ai-fullstack-starter/api-contract
-          STATUS=$?
-          kill "$SERVER_PID"
-          exit $STATUS
