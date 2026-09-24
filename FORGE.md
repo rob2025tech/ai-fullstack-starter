@@ -105,3 +105,10 @@
 - **Files:** 2 (+155/-4)
 - **Duration:** 353ss
 - **Approach:** Removed the hard-coded USER_ID constant and user_id from the answerLearningQuestion call in AdaptiveTutor. Added isUnauthorizedContractError predicate that checks instanceof ContractError && code === 'unauthorized'. Added sessionExpired boolean state; the catch block branches: unauthorized sets sessionExpired(true) without touching mastery/state/result, all other errors go to the existing setError path. Added amber recovery message rendered when sessionExpired is true. Cleared sessionExpired in retry() and at submitAnswer start. Created source inspection test file with fixtures for LearningStateResponse, LearningAnswerResponse, and a deterministic 401 ContractError fixture, plus tests verifying predicate existence, recovery message in source, and that the unauthorized branch never calls setState or setResult.
+
+## WO-015: User Story: WO-015 - Add mobile bearer session helpers
+- **Status:** completed
+- **Commit:** `5d559da`
+- **Files:** 2 (+189/-13)
+- **Duration:** 176ss
+- **Approach:** Added two type aliases (SessionBootstrapRequest, SessionBootstrapResponse) from the generated contract types to mobile/lib/api.ts. Added exported bootstrapSession() that always requests bearer transport via POST /api/v1/session/bootstrap and returns the typed response through the existing errorFromResponse error path. Added SendChatOptions interface with optional sessionToken field and updated sendChat() to accept it as an optional second argument, adding Authorization: Bearer <token> to fetch headers only when sessionToken is truthy (empty string is intentionally excluded). Existing sendChat callers with no options argument continue to work unchanged. Extended api.test.ts with deterministic fixtures for SessionBootstrapResponse and ChatResponse, bootstrapSession success/error/network-failure tests, four bearer-token sendChat tests covering with-token, stream:false-with-token, no-token, and empty-token cases, and two fixture shape tests.
