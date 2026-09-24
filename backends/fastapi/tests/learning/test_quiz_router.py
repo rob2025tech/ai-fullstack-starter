@@ -373,6 +373,21 @@ def test_quiz_answer_alpha_cannot_mutate_beta_state() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_tampered_bearer_token_returns_401_for_quiz_answer() -> None:
+    """A tampered JWT is rejected with 401 on quiz/answer in protected mode (AC-4, AC-6)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers={"Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhdHRhY2tlciJ9.tampered-sig"},
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
 def test_quiz_answer_without_session_returns_401_in_protected_mode() -> None:
     """POST /api/v1/learning/quiz/answer returns 401 envelope without session (AC-7)."""
     client = _shared_demo_client()

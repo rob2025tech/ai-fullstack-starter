@@ -245,6 +245,43 @@ def test_answer_learning_without_session_returns_401_in_protected_mode() -> None
     assert body["error"]["code"] == "unauthorized"
 
 
+def test_tampered_bearer_token_returns_401_in_protected_mode() -> None:
+    """A structurally valid but signature-tampered JWT is rejected with 401 (AC-4)."""
+    client = _shared_demo_client()
+    response = client.post(
+        "/api/v1/learning/answer",
+        json={"concept": "additive-versioning", "answer": "anything"},
+        headers={"Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhdHRhY2tlciJ9.tampered-signature"},
+    )
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "unauthorized"
+
+
+def test_learner_alpha_answer_then_state_reflects_session_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """learner-alpha posts /answer then /state — attempts increments and user_id matches session (AC-2)."""
+    shared_demo_client.post(
+        "/api/v1/learning/answer",
+        json={"concept": "additive-versioning", "answer": "Adding a new optional field to a response"},
+        headers=learner_alpha_headers,
+    )
+
+    state_response = shared_demo_client.get(
+        "/api/v1/learning/state",
+        params={"concept": "additive-versioning"},
+        headers=learner_alpha_headers,
+    )
+
+    assert state_response.status_code == 200
+    body = state_response.json()
+    assert body["user_id"] == "learner-alpha"
+    assert body["attempts"] == 1
+    assert body["correct_count"] == 1
+
+
 def test_session_derived_identity_is_isolated_in_protected_mode() -> None:
     """Two learners in shared-demo mode see separate state partitions (AC-4, AC-6)."""
     client = _shared_demo_client()
