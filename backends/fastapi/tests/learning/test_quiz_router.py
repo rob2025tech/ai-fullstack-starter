@@ -1,4 +1,5 @@
 from app.auth.sessions import issue_session
+from app.config.settings import Settings
 from app.learning.repository import InMemoryLearningRepository
 from app.learning.service import LearningService
 from app.main import create_app
@@ -176,7 +177,17 @@ def test_client_user_id_cannot_override_authenticated_quiz_identity() -> None:
 
 
 def test_answer_learning_practice_requires_authenticated_identity() -> None:
-    client = _shared_demo_client()
+    app = create_app(
+        Settings(
+            _env_file=None,
+            deployment_mode="shared-demo",
+            session_secret="test-secret",
+        )
+    )
+    app.state.learning_service = LearningService(
+        InMemoryLearningRepository(),
+    )
+    client = TestClient(app)
 
     response = client.post(
         "/api/v1/learning/quiz/practice",
@@ -212,7 +223,17 @@ def test_answer_learning_practice_uses_authenticated_identity() -> None:
 
 
 def test_answer_learning_retest_requires_authenticated_identity() -> None:
-    client = _shared_demo_client()
+    app = create_app(
+        Settings(
+            _env_file=None,
+            deployment_mode="shared-demo",
+            session_secret="test-secret",
+        )
+    )
+    app.state.learning_service = LearningService(
+        InMemoryLearningRepository(),
+    )
+    client = TestClient(app)
 
     response = client.post(
         "/api/v1/learning/quiz/retest",
