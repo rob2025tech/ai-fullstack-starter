@@ -168,3 +168,10 @@
 - **Files:** 3 (+154/-2)
 - **Duration:** 184ss
 - **Approach:** Read adr-004, the ADR README index, and adr-001 to understand the existing ADR style and the current no-auth status. Made three targeted changes: (1) changed adr-004 Status from Accepted to 'Superseded by ADR-007' with a direct relative link; (2) created adr-007 in the same ADR format (Status/Date/Supersedes/Context/Decision/Consequences/Migration waves) with all required content: deployment-mode table (local/shared-demo/production), FastAPI as the sole session authority referencing app/auth/sessions.py, web HttpOnly cookie transport via web/lib/api.ts, mobile bearer-token transport via mobile/lib/api.ts, fail-closed protected-mode rules, server-derived learner identity overriding client-supplied user_id, InMemoryLearningRepository as the current state store, six migration waves (Baseline→Backend guard→Protected route integration→Contract+client migration→Canary→Rollback), ADR-001/ADR-002/ADR-006 constraints; (3) updated README.md index to show ADR-004 as Superseded by ADR-007 and added ADR-007 as Accepted. No code files were modified.
+
+## WO-024: User Story: WO-024 - Document FastAPI protected deployment
+- **Status:** completed
+- **Commit:** `579272c`
+- **Files:** 1 (+138/-3)
+- **Duration:** 204ss
+- **Approach:** Read the existing fastapi/README.md (62 lines) and app/main.py to understand current content and the actual CORS and docs settings. Found that main.py already has allow_credentials=True and disables /docs and /redoc in protected modes — the README was simply missing operator documentation for these behaviours. Replaced the stale configuration section (which referenced 'ADR-004 no-auth; runs secretless') with an updated configuration table including the four auth-related settings, then appended five new operator-runbook sections: deployment-mode matrix, managed secrets, CORS credentials policy, endpoint exposure table, and interactive docs exposure rules. Also updated the contract obligations section to include the 401 behaviour. No Python files were modified.
