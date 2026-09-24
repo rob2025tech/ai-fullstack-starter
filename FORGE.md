@@ -161,3 +161,10 @@
 - **Files:** 2 (+145/-0)
 - **Duration:** 142ss
 - **Approach:** Read both existing READMEs in full to understand current content and locate natural insertion points. web/README.md had chat/SSE notes but nothing about cookie sessions or learning auth; mobile/README.md had strong Expo LAN + JSON-mode chat coverage but no bearer-token guidance. Added a 'Protected learning transport' section to each file covering exactly the ACs: web gets credentials:include, the no-user_id warning for retention-quiz and adaptive-tutor, and openapi.yaml reference; mobile gets bootstrapSession() usage, useRef storage (explicitly excluding AsyncStorage/SecureStore), Authorization header pattern with placeholder token, EXPO_PUBLIC_* secret exclusion, ADR-006 JSON-mode preservation note, and openapi.yaml reference. No code files were modified.
+
+## WO-023: User Story: WO-023 - Supersede no-auth ADR
+- **Status:** completed
+- **Commit:** `5a9853b`
+- **Files:** 3 (+154/-2)
+- **Duration:** 184ss
+- **Approach:** Read adr-004, the ADR README index, and adr-001 to understand the existing ADR style and the current no-auth status. Made three targeted changes: (1) changed adr-004 Status from Accepted to 'Superseded by ADR-007' with a direct relative link; (2) created adr-007 in the same ADR format (Status/Date/Supersedes/Context/Decision/Consequences/Migration waves) with all required content: deployment-mode table (local/shared-demo/production), FastAPI as the sole session authority referencing app/auth/sessions.py, web HttpOnly cookie transport via web/lib/api.ts, mobile bearer-token transport via mobile/lib/api.ts, fail-closed protected-mode rules, server-derived learner identity overriding client-supplied user_id, InMemoryLearningRepository as the current state store, six migration waves (Baseline→Backend guard→Protected route integration→Contract+client migration→Canary→Rollback), ADR-001/ADR-002/ADR-006 constraints; (3) updated README.md index to show ADR-004 as Superseded by ADR-007 and added ADR-007 as Accepted. No code files were modified.
