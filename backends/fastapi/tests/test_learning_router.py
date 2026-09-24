@@ -282,6 +282,87 @@ def test_learner_alpha_answer_then_state_reflects_session_identity(
     assert body["correct_count"] == 1
 
 
+# ---------------------------------------------------------------------------
+# AC-2: Centralised fixture tests — GET /state and POST /answer
+# ---------------------------------------------------------------------------
+
+
+def test_missing_session_fixture_returns_401_for_learning_state(
+    shared_demo_client: TestClient,
+    missing_session_headers: dict[str, str],
+) -> None:
+    """GET /state with missing_session_headers fixture returns 401 (AC-2)."""
+    response = shared_demo_client.get(
+        "/api/v1/learning/state",
+        params={"concept": "additive-versioning"},
+        headers=missing_session_headers,
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_tampered_session_fixture_returns_401_for_learning_state(
+    shared_demo_client: TestClient,
+    tampered_session_headers: dict[str, str],
+) -> None:
+    """GET /state with tampered_session_headers fixture returns 401 (AC-2)."""
+    response = shared_demo_client.get(
+        "/api/v1/learning/state",
+        params={"concept": "additive-versioning"},
+        headers=tampered_session_headers,
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_expired_session_fixture_returns_401_for_learning_state(
+    shared_demo_client: TestClient,
+    expired_session_headers: dict[str, str],
+) -> None:
+    """GET /state with expired_session_headers fixture returns 401 (AC-2)."""
+    response = shared_demo_client.get(
+        "/api/v1/learning/state",
+        params={"concept": "additive-versioning"},
+        headers=expired_session_headers,
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_expired_session_fixture_returns_401_for_learning_answer(
+    shared_demo_client: TestClient,
+    expired_session_headers: dict[str, str],
+) -> None:
+    """POST /answer with expired token returns 401 and contract envelope (AC-5)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/answer",
+        json={
+            "concept": "additive-versioning",
+            "answer": "Adding a new optional field to a response",
+        },
+        headers=expired_session_headers,
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_tampered_session_fixture_returns_401_for_learning_answer(
+    shared_demo_client: TestClient,
+    tampered_session_headers: dict[str, str],
+) -> None:
+    """POST /answer with tampered token returns 401 and contract envelope (AC-5)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/answer",
+        json={
+            "concept": "additive-versioning",
+            "answer": "Adding a new optional field to a response",
+        },
+        headers=tampered_session_headers,
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
 def test_session_derived_identity_is_isolated_in_protected_mode() -> None:
     """Two learners in shared-demo mode see separate state partitions (AC-4, AC-6)."""
     client = _shared_demo_client()

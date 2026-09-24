@@ -422,3 +422,66 @@ def test_quiz_retest_without_session_returns_401_in_protected_mode() -> None:
     )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
+
+
+# ---------------------------------------------------------------------------
+# AC-3, AC-4: Centralised valid-session fixture tests for all three quiz
+# mutation endpoints — exercises conftest.py shared_demo_client and
+# learner_alpha_headers fixtures and asserts session-derived identity.
+# ---------------------------------------------------------------------------
+
+
+def test_quiz_answer_with_valid_session_fixture_uses_token_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """POST /api/v1/learning/quiz/answer with learner_alpha_headers returns 200
+    and response user_id reflects the signed session subject, not the
+    request body (AC-3, AC-4)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/quiz/answer",
+        json={
+            "user_id": "attacker-id",  # spoofed — must be overridden by session
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "So a flaky LLM provider degrades to a deterministic explanation instead of crashing a live demo",
+        },
+        headers=learner_alpha_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["user_id"] == "learner-alpha"
+
+
+def test_quiz_practice_with_valid_session_fixture_uses_token_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """POST /api/v1/learning/quiz/practice with learner_alpha_headers returns 200
+    and response user_id reflects the signed session subject (AC-3)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/quiz/practice",
+        json={
+            "concept": "provider-fallback-pattern",
+            "selected_answer": "anything",
+        },
+        headers=learner_alpha_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["user_id"] == "learner-alpha"
+
+
+def test_quiz_retest_with_valid_session_fixture_uses_token_identity(
+    shared_demo_client: TestClient,
+    learner_alpha_headers: dict[str, str],
+) -> None:
+    """POST /api/v1/learning/quiz/retest with learner_alpha_headers returns 200
+    and response user_id reflects the signed session subject (AC-3)."""
+    response = shared_demo_client.post(
+        "/api/v1/learning/quiz/retest",
+        json={
+            "concept": "additive-versioning",
+            "selected_answer": "Add the new field without removing or changing existing fields",
+        },
+        headers=learner_alpha_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["user_id"] == "learner-alpha"

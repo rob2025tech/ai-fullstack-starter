@@ -63,3 +63,56 @@ def learner_beta_headers(shared_demo_client: TestClient) -> dict[str, str]:
         "learner-beta",
     )
     return {"Authorization": f"Bearer {token}"}
+
+
+# ---------------------------------------------------------------------------
+# Invalid / expired / missing session fixtures (AC-1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def missing_session_headers() -> dict[str, str]:
+    """Empty headers dict — no session credential attached.
+
+    Represents a completely unauthenticated request; simulates a client
+    that has never bootstrapped a session.
+    """
+    return {}
+
+
+@pytest.fixture()
+def tampered_session_headers(shared_demo_client: TestClient) -> dict[str, str]:
+    """Valid JWT structure but with the signature portion corrupted post-signing.
+
+    Produced by issuing a legitimately signed token and then flipping a
+    single character in the base64url signature segment.  This ensures the
+    test exercises signature-verification rejection rather than parser
+    rejection of a malformed string.
+    """
+    token = issue_anonymous_session(
+        shared_demo_client.app.state.settings,
+        "tampered-test-subject",
+    )
+    header, payload, sig = token.split(".")
+    # Flip the last character to a different base64url character
+    last_char = sig[-1]
+    replacement = "B" if last_char != "B" else "C"
+    corrupted_sig = sig[:-1] + replacement
+    tampered = f"{header}.{payload}.{corrupted_sig}"
+    return {"Authorization": f"Bearer {tampered}"}
+
+
+@pytest.fixture()
+def expired_session_headers(shared_demo_client: TestClient) -> dict[str, str]:
+    """Cryptographically valid JWT whose exp claim is well in the past.
+
+    Issued with ``now=0`` (Unix epoch) so ``exp = session_ttl_seconds``
+    (28 800 by default), which expired in 1970 and is guaranteed to fail
+    the expiry check without relying on wall-clock sleep.
+    """
+    token = issue_anonymous_session(
+        shared_demo_client.app.state.settings,
+        "expired-test-subject",
+        now=0,  # iat=0, exp=28800 — expired in 1970
+    )
+    return {"Authorization": f"Bearer {token}"}
