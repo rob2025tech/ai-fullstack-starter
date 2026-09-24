@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import {
   answerLearningQuestion,
-  type ContractError,
+  ContractError,
 } from "@/lib/api";
 import type { components } from "@ai-fullstack-starter/api-contract";
 
@@ -15,7 +15,6 @@ type LearningState =
 type LearningAnswerResponse =
   components["schemas"]["LearningAnswerResponse"];
 
-const USER_ID = "demo-student";
 const CONCEPT = "虽然";
 
 const choices = [
@@ -47,6 +46,10 @@ function formatReviewDate(value: string | null) {
   });
 }
 
+function isUnauthorizedContractError(err: unknown): err is ContractError {
+  return err instanceof ContractError && err.code === "unauthorized";
+}
+
 function toContractError(err: unknown): ContractError {
   if (err instanceof Error && "code" in err) {
     return err as ContractError;
@@ -68,6 +71,7 @@ export default function AdaptiveTutor() {
     useState<LearningAnswerResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ContractError | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const mastery =
     result?.mastery_after ?? state?.mastery ?? 0.32;
@@ -83,10 +87,10 @@ export default function AdaptiveTutor() {
   async function submitAnswer(answer: string) {
     setLoading(true);
     setError(null);
+    setSessionExpired(false);
 
     try {
       const response = await answerLearningQuestion({
-        user_id: USER_ID,
         concept: CONCEPT,
         answer,
       });
@@ -103,7 +107,11 @@ export default function AdaptiveTutor() {
         next_review_at: response.next_review_at,
       });
     } catch (err) {
-      setError(toContractError(err));
+      if (isUnauthorizedContractError(err)) {
+        setSessionExpired(true);
+      } else {
+        setError(toContractError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -112,6 +120,7 @@ export default function AdaptiveTutor() {
   function retry() {
     setResult(null);
     setError(null);
+    setSessionExpired(false);
   }
 
   return (
@@ -300,6 +309,12 @@ export default function AdaptiveTutor() {
                     Practice again
                   </button>
                 )}
+              </div>
+            )}
+
+            {sessionExpired && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                Your session has expired. Please refresh the page to restore your session and continue learning.
               </div>
             )}
 

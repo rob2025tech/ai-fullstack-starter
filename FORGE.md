@@ -98,3 +98,10 @@
 - **Files:** 2 (+147/-5)
 - **Duration:** 188ss
 - **Approach:** Removed the hard-coded USER_ID constant and all three user_id properties from the RetentionQuiz component's API submission calls. The three call sites (answerLearningQuiz, answerLearningPractice, answerLearningRetest) now pass only concept and selected_answer, letting web/lib/api.ts own the session-credential transport. Created a source-inspection Vitest test file that reads the component source and asserts the absence of USER_ID, demo-student, and user_id properties in all three submission call objects. Included deterministic response fixture constants for all four response types (AC-5) without requiring any network access or DOM rendering.
+
+## WO-014: User Story: WO-014 - Make adaptive tutor session-recoverable
+- **Status:** completed
+- **Commit:** `40e9927`
+- **Files:** 2 (+155/-4)
+- **Duration:** 353ss
+- **Approach:** Removed the hard-coded USER_ID constant and user_id from the answerLearningQuestion call in AdaptiveTutor. Added isUnauthorizedContractError predicate that checks instanceof ContractError && code === 'unauthorized'. Added sessionExpired boolean state; the catch block branches: unauthorized sets sessionExpired(true) without touching mastery/state/result, all other errors go to the existing setError path. Added amber recovery message rendered when sessionExpired is true. Cleared sessionExpired in retry() and at submitAnswer start. Created source inspection test file with fixtures for LearningStateResponse, LearningAnswerResponse, and a deterministic 401 ContractError fixture, plus tests verifying predicate existence, recovery message in source, and that the unauthorized branch never calls setState or setResult.
