@@ -126,3 +126,10 @@
 - **Files:** 2 (+114/-3)
 - **Duration:** 209ss
 - **Approach:** Added useEffect to App.tsx's existing React imports and imported bootstrapSession alongside sendChat from ./lib/api. Added sessionTokenRef (useRef<string | null>(null)) to hold the bearer token for the app lifetime. Wired bootstrapSession() in a useEffect with empty deps array: on success stores session.access_token ?? null in the ref; on failure formats a ContractError message and sets the existing error state for the recoverable error display. Updated the sendChat call to pass ({ prompt: trimmed }, sessionTokenRef.current ? { sessionToken: sessionTokenRef.current } : undefined) — the request object stays prompt-only with no stream property, preserving ADR-006 JSON mode ownership in api.ts. The token is reused across all subsequent sends without re-bootstrapping. Created App.session.test.tsx using source inspection (same pattern as prior WOs) with BOOTSTRAP_RESPONSE_FIXTURE and CHAT_RESPONSE_FIXTURE constants.
+
+## WO-016: User Story: WO-016 - Test protected startup settings matrix
+- **Status:** completed
+- **Commit:** `5c6df9c`
+- **Files:** 1 (+132/-0)
+- **Duration:** 116ss
+- **Approach:** Inspected the existing Settings model_validator and create_app function. The validation is in Settings._require_secret_in_protected_modes (raises pydantic.ValidationError via ValueError for blank/missing session_secret in shared-demo or production modes). test_main_startup_policy.py from WO-010 already covered some startup behavior, but WO-016 explicitly requires a separate test_settings_startup_matrix.py. Created the file with three explicit named profiles: (1) local mode without secret — app constructs, health returns 200, no OPENAI_API_KEY needed; (2) shared-demo without secret — Settings raises ValidationError for None, whitespace, and empty-string secrets; production mode also tested; (3) shared-demo with valid placeholder secret — app constructs, health returns 200, unauthenticated learning returns 401. Validation failure occurs at Settings construction time (before create_app returns), which is the correct fail-closed boundary.
