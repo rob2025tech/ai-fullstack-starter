@@ -119,3 +119,10 @@
 - **Files:** 3 (+107/-0)
 - **Duration:** 232ss
 - **Approach:** Audited existing test files and identified that all session-derived identity assertions and 401 protected-mode tests were already in place from WO-011/WO-012. The two gaps were: (1) conftest.py lacked proper pytest fixtures for learner_alpha/beta and the shared_demo_client — tests used ad-hoc helper functions instead; (2) no test covered tampered/malformed JWT tokens. Added _SHARED_SECRET placeholder constant, KNOWN_CONCEPT constant, shared_demo_client fixture, learner_alpha_headers fixture, and learner_beta_headers fixture to conftest.py. Added test_tampered_bearer_token_returns_401_in_protected_mode to test_learning_router.py using the new fixtures. Added test_learner_alpha_answer_then_state_reflects_session_identity as the explicit AC-2 named learner-alpha flow (posts /answer then reads /state, asserts attempts incremented and user_id reflects session). Added test_tampered_bearer_token_returns_401_for_quiz_answer to test_quiz_router.py. All existing tests are preserved unchanged.
+
+## WO-020: User Story: WO-020 - Store mobile session for chat
+- **Status:** completed
+- **Commit:** `8963d57`
+- **Files:** 2 (+114/-3)
+- **Duration:** 209ss
+- **Approach:** Added useEffect to App.tsx's existing React imports and imported bootstrapSession alongside sendChat from ./lib/api. Added sessionTokenRef (useRef<string | null>(null)) to hold the bearer token for the app lifetime. Wired bootstrapSession() in a useEffect with empty deps array: on success stores session.access_token ?? null in the ref; on failure formats a ContractError message and sets the existing error state for the recoverable error display. Updated the sendChat call to pass ({ prompt: trimmed }, sessionTokenRef.current ? { sessionToken: sessionTokenRef.current } : undefined) — the request object stays prompt-only with no stream property, preserving ADR-006 JSON mode ownership in api.ts. The token is reused across all subsequent sends without re-bootstrapping. Created App.session.test.tsx using source inspection (same pattern as prior WOs) with BOOTSTRAP_RESPONSE_FIXTURE and CHAT_RESPONSE_FIXTURE constants.
