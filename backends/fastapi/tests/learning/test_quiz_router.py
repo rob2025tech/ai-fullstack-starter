@@ -176,7 +176,7 @@ def test_client_user_id_cannot_override_authenticated_quiz_identity() -> None:
 
 
 def test_answer_learning_practice_requires_authenticated_identity() -> None:
-    client = make_client()
+    client = _shared_demo_client()
 
     response = client.post(
         "/api/v1/learning/quiz/practice",
@@ -212,7 +212,7 @@ def test_answer_learning_practice_uses_authenticated_identity() -> None:
 
 
 def test_answer_learning_retest_requires_authenticated_identity() -> None:
-    client = make_client()
+    client = _shared_demo_client()
 
     response = client.post(
         "/api/v1/learning/quiz/retest",
