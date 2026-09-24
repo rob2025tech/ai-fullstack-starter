@@ -410,6 +410,94 @@ npm run generate -w @ai-fullstack-starter/api-contract
 
 ---
 
+# Protected learning transport
+
+Learning mutation endpoints (`POST /api/v1/learning/answer`,
+`POST /api/v1/learning/quiz/answer`, `POST /api/v1/learning/quiz/practice`,
+`POST /api/v1/learning/quiz/retest`) require session authentication in
+`shared-demo` and `production` deployment modes. Expo and React Native
+clients use **bearer-token transport** because React Native networking does
+not share the browser cookie lifecycle.
+
+## Token bootstrap via `mobile/lib/api.ts`
+
+Call `bootstrapSession()` from `mobile/lib/api.ts` once on app mount to
+obtain a short-lived signed token:
+
+```ts
+import { bootstrapSession } from './lib/api';
+
+// On app mount — store in a React ref, not AsyncStorage or SecureStore
+const session = await bootstrapSession();
+// session.access_token is the signed bearer token
+```
+
+Store the token in a `React.useRef` for the lifetime of the app session.
+Do **not** persist it to `AsyncStorage`, `SecureStore`, the keychain, or
+any other durable storage — the token is short-lived and must be
+re-bootstrapped on each app launch.
+
+## Authorization header propagation
+
+Pass the session token to `sendChat` and any future protected learning
+helpers via the `sessionToken` option in `mobile/lib/api.ts`:
+
+```ts
+await sendChat({ prompt }, { sessionToken: session.access_token });
+```
+
+For protected learning endpoints, set the `Authorization` header:
+
+```ts
+headers: { 'Authorization': 'Bearer <token>' }
+```
+
+Replace `<token>` with the value returned by `bootstrapSession()`. Never
+commit a real token or signing secret to source.
+
+## Learner identity is backend-derived
+
+The backend derives learner identity exclusively from the signed session
+token. Any `user_id` field in a request body is ignored by protected
+endpoints. Do not pass a hard-coded learner identifier from the mobile
+client for learning mutations.
+
+## Secrets stay in the backend
+
+`EXPO_PUBLIC_*` variables are bundled into the app binary and are visible
+to anyone who inspects it. Do **not** place session signing secrets, API
+keys, or long-lived tokens in `EXPO_PUBLIC_API_BASE_URL` or any other
+`EXPO_PUBLIC_*` variable. All secret values live in backend configuration
+(see `backends/fastapi/app/config/settings.py`).
+
+## JSON-mode chat is unchanged (ADR-006)
+
+Protected learning bearer transport does **not** require SSE support.
+`POST /api/v1/chat` continues to use `stream: false` JSON mode on day-one
+mobile (ADR-006). Adding an `Authorization` header to future learning calls
+is orthogonal to the chat transport — it does not change the chat endpoint
+shape and does not require an SSE polyfill.
+
+## Error handling
+
+A `401 Unauthorized` response from a learning endpoint means the session
+token is absent or expired. The `error.code` field in the response body
+will be `"unauthorized"` (defined in `packages/api-contract/openapi.yaml`).
+Re-bootstrap the session by calling `bootstrapSession()` again.
+
+## Contract reference
+
+Protected learning request and response shapes are governed by
+`packages/api-contract/openapi.yaml`. TypeScript types are generated from
+the spec — never hand-edit files under `packages/api-contract/src/generated/`.
+Regenerate after any spec change:
+
+```bash
+npm run generate -w @ai-fullstack-starter/api-contract
+```
+
+---
+
 # Quick reference
 
 ## Physical iPhone

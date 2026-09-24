@@ -154,3 +154,10 @@
 - **Files:** 1 (+32/-6)
 - **Duration:** 203ss
 - **Approach:** Read the existing ci.yml (51 lines) to preserve all existing steps. Made three targeted changes to the fastapi job: (1) gave the existing pytest step an explicit name and added a second dedicated step running only test_settings_startup_matrix.py -q (AC-1); (2) added a shared-demo fail-closed gate that sets DEPLOYMENT_MODE=shared-demo via step env:, then runs Python -c to confirm Settings() raises a validation error — exits nonzero if it does not (AC-2); (3) replaced the old secretless conformance step with a protected-mode version that sets DEPLOYMENT_MODE=shared-demo and SESSION_SECRET=ci-only-test-placeholder-not-for-production-use via step env:, adds trap-based SERVER_PID cleanup on EXIT, adds a READY flag with an explicit health-readiness failure guard, and runs the CONTRACT_BASE_URL conformance command (AC-3/AC-4). All original ruff, pytest, npm generate, npm test, npm typecheck, and conformance commands remain present.
+
+## WO-022: User Story: WO-022 - Document client session transports
+- **Status:** completed
+- **Commit:** `3376d55`
+- **Files:** 2 (+145/-0)
+- **Duration:** 142ss
+- **Approach:** Read both existing READMEs in full to understand current content and locate natural insertion points. web/README.md had chat/SSE notes but nothing about cookie sessions or learning auth; mobile/README.md had strong Expo LAN + JSON-mode chat coverage but no bearer-token guidance. Added a 'Protected learning transport' section to each file covering exactly the ACs: web gets credentials:include, the no-user_id warning for retention-quiz and adaptive-tutor, and openapi.yaml reference; mobile gets bootstrapSession() usage, useRef storage (explicitly excluding AsyncStorage/SecureStore), Authorization header pattern with placeholder token, EXPO_PUBLIC_* secret exclusion, ADR-006 JSON-mode preservation note, and openapi.yaml reference. No code files were modified.
