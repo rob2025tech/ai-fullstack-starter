@@ -49,3 +49,10 @@
 - **Files:** 4 (+813/-0)
 - **Duration:** 229ss
 - **Approach:** Created agent_models.py with 8 Pydantic models (3 request + 5 response) aligned to the OpenAPI schemas, using Literal types for enums. Created agent.py router with APIRouter prefix /api/v1/agent covering all 8 contract paths. Routes read agent_repository from app.state (per learning.py pattern), map NotFoundError/InvalidApprovalTransitionError to InvalidRequestError, and emit SSE frames via StreamingResponse. Added list_tasks(session_id) to AgentRepository to avoid accessing private _db from router code. Router is not wired into create_app per the WO constraint.
+
+## WO-006: User Story: WO-006 - Implement deterministic tool registry
+- **Status:** completed
+- **Commit:** `917ac98`
+- **Files:** 4 (+610/-0)
+- **Duration:** 244ss
+- **Approach:** Created a pure domain module (no FastAPI/LLMProvider imports) with four public types: ToolRisk (str enum: read_only/mutating/unsafe), frozen ToolDefinition dataclass (name, description, input_schema, output_schema, callable, risk), ToolResult dataclass (tool_name, risk, output, metadata), and ToolInvocationError (reason, tool_name, details). ToolRegistry holds an insertion-ordered dict. register() rejects empty/whitespace names and duplicates before mutating state. invoke() does: exact-name lookup → Pydantic input validation → callable call with exception wrapping → Pydantic output validation → ToolResult. errors.py not modified (registry errors are self-contained).
