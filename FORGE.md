@@ -42,3 +42,10 @@
 - **Files:** 2 (+255/-0)
 - **Duration:** 220ss
 - **Approach:** Inspected pyproject.toml and requirements-lock.txt first and confirmed all declared runtime and dev dependencies were already exactly pinned. Created test_requirements_lock.py using stdlib tomllib (with tomli fallback for Python 3.10 CI environments). The test normalizes package names with PEP 503 rules (lowercase, collapse [-_.] to hyphen) then asserts: all runtime deps pinned ==, all dev deps pinned == or in _DEV_EXCLUSIONS set, the 9 AC-required packages are pinned, no range pins for declared packages, no editable installs, and pinned versions satisfy declared lower bounds. Updated README with a titled 'Deterministic dependency lock workflow' section covering all four required command groups.
+
+## WO-007: User Story: WO-007 - Implement agent models and router
+- **Status:** completed
+- **Commit:** `f68b111`
+- **Files:** 4 (+813/-0)
+- **Duration:** 229ss
+- **Approach:** Created agent_models.py with 8 Pydantic models (3 request + 5 response) aligned to the OpenAPI schemas, using Literal types for enums. Created agent.py router with APIRouter prefix /api/v1/agent covering all 8 contract paths. Routes read agent_repository from app.state (per learning.py pattern), map NotFoundError/InvalidApprovalTransitionError to InvalidRequestError, and emit SSE frames via StreamingResponse. Added list_tasks(session_id) to AgentRepository to avoid accessing private _db from router code. Router is not wired into create_app per the WO constraint.

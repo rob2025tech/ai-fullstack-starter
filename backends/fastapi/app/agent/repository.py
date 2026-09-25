@@ -374,6 +374,25 @@ class AgentRepository:
             updated_at=_from_iso(row["updated_at"]),
         )
 
+    def list_tasks(self, session_id: str) -> list[AgentTask]:
+        """Return all tasks for a session ordered by creation time."""
+        rows = self._db.execute(
+            "SELECT * FROM agent_tasks WHERE session_id = ? ORDER BY created_at ASC",
+            (session_id,),
+        ).fetchall()
+        return [
+            AgentTask(
+                task_id=r["task_id"],
+                session_id=r["session_id"],
+                status=r["status"],
+                prompt=r["prompt"],
+                result=r["result"],
+                created_at=_from_iso(r["created_at"]),
+                updated_at=_from_iso(r["updated_at"]),
+            )
+            for r in rows
+        ]
+
     def update_task_status(
         self,
         task_id: str,
