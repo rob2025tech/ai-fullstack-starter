@@ -70,3 +70,10 @@
 - **Files:** 2 (+571/-0)
 - **Duration:** 546ss
 - **Approach:** Implemented WorkspacePolicy as a dataclass that resolves the workspace root once via pathlib.Path.resolve and exposes resolve_safe() which (1) normalizes paths via os.path.normpath to catch traversal before following symlinks, then (2) calls Path.resolve() to follow symlinks and re-checks the result stays within root. RepositoryTreeTool and FileReadTool are factory functions (PascalCase per AC) that return ToolDefinition instances with closures capturing the policy. Both are ToolRisk.read_only. The file.read tool rejects directories, oversized files, and non-UTF-8 content with structured error details.
+
+## WO-009: User Story: WO-009 - Add governed mutation and command tools
+- **Status:** completed
+- **Commit:** `ce4a9b4`
+- **Files:** 4 (+1008/-0)
+- **Duration:** 485ss
+- **Approach:** mutation.py: FileWriteInput/FileWriteOutput Pydantic models + FileWriteTool factory that reuses WorkspacePolicy.resolve_safe for path validation, enforces overwrite=False protection (returns reason=overwrite_refused without writing), create_parents flag for mkdir -p, and returns action='created'|'overwritten'. commands.py: ALWAYS_BLOCKED frozenset (rm, sudo, curl, pip, bash, ssh, etc.), GIT_READ_ONLY_SUBCOMMANDS frozenset, CommandRiskClassifier dataclass that strips path prefix and classifies argv[0] against constants (git subcommand routing, _BASE_READ_ONLY fallback, mutating default), CommandPolicy dataclass (max_output_bytes, timeout_seconds), injectable CommandRunner callable type, _default_runner using asyncio.create_subprocess_exec with shell=False, CommandInput/CommandOutput Pydantic models, and CommandTool factory that enforces: blocked→reject, mutating/unsafe+unapproved→command_requires_approval, read_only→execute. Output truncation applied per stream with truncated_stdout/truncated_stderr flags. No shell=True anywhere. No public endpoint added.
