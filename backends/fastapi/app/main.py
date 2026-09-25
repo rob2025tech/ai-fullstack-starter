@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.agent.approvals import ApprovalService
 from app.agent.repository import AgentRepository
 from app.config.settings import Settings, settings
 from app.core.errors import BackendError
@@ -74,6 +75,7 @@ def create_app(
         agent_repository_override if agent_repository_override is not None
         else AgentRepository()
     )
+    app.state.approval_service = ApprovalService(app.state.agent_repository)
     app.include_router(health.router)
     app.include_router(chat.router)
     app.include_router(learning.router)

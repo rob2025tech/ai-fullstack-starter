@@ -698,6 +698,29 @@ class AgentRepository:
         assert result is not None  # nosec
         return result
 
+    def get_approval(self, approval_id: str) -> ApprovalRequest | None:
+        """Return the approval request or ``None`` if not found."""
+        return self._get_approval(approval_id)
+
+    def expire_pending_before(self, cutoff_time: datetime) -> int:
+        """Mark all pending or approved approvals whose ``expires_at`` is before *cutoff_time* as expired.
+
+        Both pending and approved records are eligible: an approved record past
+        its TTL can no longer authorize a mutating action.
+
+        Returns the number of records updated.
+        """
+        now = _now_utc()
+        cursor = self._db.execute(
+            """
+            UPDATE approval_requests
+            SET status = 'expired', updated_at = ?
+            WHERE status IN ('pending', 'approved') AND expires_at < ?
+            """,
+            (_to_iso(now), _to_iso(cutoff_time)),
+        )
+        return cursor.rowcount
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

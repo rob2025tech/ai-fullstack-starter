@@ -77,3 +77,10 @@
 - **Files:** 4 (+1008/-0)
 - **Duration:** 485ss
 - **Approach:** mutation.py: FileWriteInput/FileWriteOutput Pydantic models + FileWriteTool factory that reuses WorkspacePolicy.resolve_safe for path validation, enforces overwrite=False protection (returns reason=overwrite_refused without writing), create_parents flag for mkdir -p, and returns action='created'|'overwritten'. commands.py: ALWAYS_BLOCKED frozenset (rm, sudo, curl, pip, bash, ssh, etc.), GIT_READ_ONLY_SUBCOMMANDS frozenset, CommandRiskClassifier dataclass that strips path prefix and classifies argv[0] against constants (git subcommand routing, _BASE_READ_ONLY fallback, mutating default), CommandPolicy dataclass (max_output_bytes, timeout_seconds), injectable CommandRunner callable type, _default_runner using asyncio.create_subprocess_exec with shell=False, CommandInput/CommandOutput Pydantic models, and CommandTool factory that enforces: blocked→reject, mutating/unsafe+unapproved→command_requires_approval, read_only→execute. Output truncation applied per stream with truncated_stdout/truncated_stderr flags. No shell=True anywhere. No public endpoint added.
+
+## WO-011: User Story: WO-011 - Implement exact-once approval service
+- **Status:** completed
+- **Commit:** `f40d84a`
+- **Files:** 4 (+830/-0)
+- **Duration:** 555ss
+- **Approach:** Created ApprovalService in backends/fastapi/app/agent/approvals.py with canonical SHA-256 action fingerprinting, injectable clock for deterministic tests, and four methods: request_approval (creates pending record + audit event), decide (idempotent approve/reject + event), expire_due_approvals (demand-driven sweep), and consume_approval (atomic binding-verified exact-once transition). Extended AgentRepository with public get_approval wrapper and expire_pending_before that sweeps both pending AND approved records past their TTL. Wired ApprovalService onto app.state in main.py. All 32 tests pass.
