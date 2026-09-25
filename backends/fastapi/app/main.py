@@ -7,6 +7,8 @@ from app.config.settings import Settings, settings
 from app.core.errors import BackendError
 from app.learning.repository import InMemoryLearningRepository
 from app.models.error_models import Error, ErrorResponse
+from app.providers.llm.base import LLMProvider
+from app.providers.llm.policy import ProviderPolicy, ProviderPolicyConfig
 from app.providers.llm.registry import build_llm_provider
 from app.routers import chat, health, learning
 from app.learning.service import LearningService
@@ -18,7 +20,21 @@ def _error_body(code: str, message: str) -> dict:
     return ErrorResponse(error=Error(code=code, message=message)).model_dump(mode="json")
 
 
-def create_app(app_settings: Settings | None = None) -> FastAPI:
+def create_app(
+    app_settings: Settings | None = None,
+    llm_provider_override: LLMProvider | None = None,
+) -> FastAPI:
+    """Create and configure the FastAPI application.
+
+    Parameters
+    ----------
+    app_settings:
+        Application settings; uses the module-level singleton when omitted.
+    llm_provider_override:
+        If provided, use this ``LLMProvider`` instead of calling
+        ``build_llm_provider``.  Intended for integration tests that need
+        to inject a specific provider (e.g. a failing stub).
+    """
     app_settings = app_settings or settings
     app = FastAPI(
         title="AI Fullstack Starter API",
@@ -33,10 +49,16 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
-    llm_provider = build_llm_provider(app_settings)
-    app.state.chat_service = ChatService(llm_provider)
+    llm_provider = llm_provider_override or build_llm_provider(app_settings)
+    policy_config = ProviderPolicyConfig(
+        timeout_seconds=app_settings.provider_timeout_seconds,
+        max_retries=app_settings.provider_max_retries,
+        max_payload_bytes=app_settings.provider_max_payload_bytes,
+    )
+    policy = ProviderPolicy(llm_provider, policy_config)
+    app.state.chat_service = ChatService(policy)
     app.state.teaching_service = TeachingService(
-        None if app_settings.llm_provider == "mock" else llm_provider
+        None if app_settings.llm_provider == "mock" and llm_provider_override is None else policy
     )
     app.state.learning_service = LearningService(
         InMemoryLearningRepository(),

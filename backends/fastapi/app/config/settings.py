@@ -19,5 +19,10 @@ class Settings(BaseSettings):
     session_secret: str | None = None
     session_ttl_seconds: int = 8 * 60 * 60
 
+    # Provider call policy — conservative local defaults
+    provider_timeout_seconds: float = 30.0
+    provider_max_retries: int = 2
+    provider_max_payload_bytes: int = 65_536  # 64 KiB
+
 
 settings = Settings()

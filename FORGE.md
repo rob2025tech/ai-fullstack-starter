@@ -21,3 +21,10 @@
 - **Files:** 4 (+1524/-0)
 - **Duration:** 496ss
 - **Approach:** Created a new backends/fastapi/app/agent/ package with a SQLite-backed AgentRepository using Python's standard-library sqlite3. The repository initializes four tables (agent_sessions, agent_tasks, agent_events, approval_requests) with appropriate indexes on creation. Events use a UNIQUE(task_id, sequence) constraint with BEGIN IMMEDIATE transactions to guarantee monotonic per-task ordering. consume_approval_once is serialized with BEGIN IMMEDIATE to prevent double-consumption. All metadata/payload columns store JSON text with typed deserialization errors. Timestamps are UTC ISO 8601 strings stored/returned as timezone-aware datetime objects. No ORM, Redis, or external database service introduced. 35 tests cover entity fields, durability (close+reopen), session isolation, fixture helpers, approval exact-once guarantee, and edge cases.
+
+## WO-003: User Story: WO-003 - Add provider call policy wrapper
+- **Status:** completed
+- **Commit:** `edff63a`
+- **Files:** 7 (+658/-17)
+- **Duration:** 449ss
+- **Approach:** Introduced ProviderPolicy as a thin reliability wrapper around LLMProvider.generate. ProviderPolicyConfig (dataclass with __post_init__ validation) holds timeout_seconds, max_retries, and max_payload_bytes. ProviderPolicy.generate enforces: (1) UTF-8 byte size check before any I/O, (2) asyncio.wait_for timeout, (3) ProviderUnavailableError retry up to max_retries, (4) no retry for ProviderError or InvalidRequestError, (5) bare-exception normalisation to ProviderError. ChatService and TeachingService constructors changed to accept ProviderPolicy; streaming path kept unchanged via policy.provider accessor. create_app gained an llm_provider_override parameter for test injection. Settings gained three new fields with safe defaults.
