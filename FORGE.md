@@ -56,3 +56,10 @@
 - **Files:** 4 (+610/-0)
 - **Duration:** 244ss
 - **Approach:** Created a pure domain module (no FastAPI/LLMProvider imports) with four public types: ToolRisk (str enum: read_only/mutating/unsafe), frozen ToolDefinition dataclass (name, description, input_schema, output_schema, callable, risk), ToolResult dataclass (tool_name, risk, output, metadata), and ToolInvocationError (reason, tool_name, details). ToolRegistry holds an insertion-ordered dict. register() rejects empty/whitespace names and duplicates before mutating state. invoke() does: exact-name lookup → Pydantic input validation → callable call with exception wrapping → Pydantic output validation → ToolResult. errors.py not modified (registry errors are self-contained).
+
+## WO-010: User Story: WO-010 - Wire agent services into FastAPI
+- **Status:** completed
+- **Commit:** `06868ad`
+- **Files:** 4 (+165/-11)
+- **Duration:** 271ss
+- **Approach:** Made the smallest composition-root change: added AgentRepository import and agent router import to main.py, instantiated AgentRepository() (defaults to :memory: for per-call isolation) on app.state.agent_repository, and added app.include_router(agent.router) after the existing three routers. Added an optional agent_repository_override parameter to create_app() for test injection without changing the default call. Updated all 8 agent route response declarations to include 401 to match the canonical spec. Added AgentSseEvent to DOC_ONLY_SCHEMAS since the SSE stream endpoint returns StreamingResponse with no typed model and FastAPI does not auto-emit that schema.

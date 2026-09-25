@@ -5,8 +5,9 @@ import yaml
 from app.main import create_app
 
 SPEC_PATH = Path(__file__).resolve().parents[3] / "packages" / "api-contract" / "openapi.yaml"
-# Contract-only schemas that document SSE payloads; FastAPI never emits them.
-DOC_ONLY_SCHEMAS = {"SseDeltaEvent"}
+# Contract-only schemas that document SSE payloads; FastAPI never emits them
+# because the streaming endpoints return StreamingResponse with no typed model.
+DOC_ONLY_SCHEMAS = {"SseDeltaEvent", "AgentSseEvent"}
 
 
 def _canonical() -> dict:

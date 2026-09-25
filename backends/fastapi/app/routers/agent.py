@@ -105,7 +105,7 @@ def _approval_response(approval) -> ApprovalRequestResponse:
     "/sessions",
     response_model=AgentSessionResponse,
     status_code=201,
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def create_session(
     body: CreateAgentSessionRequest,
@@ -123,7 +123,7 @@ async def create_session(
 @router.get(
     "/sessions/{session_id}",
     response_model=AgentSessionResponse,
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def get_session(
     session_id: str,
@@ -145,7 +145,7 @@ async def get_session(
     "/sessions/{session_id}/tasks",
     response_model=AgentTaskResponse,
     status_code=202,
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def submit_task(
     session_id: str,
@@ -182,7 +182,7 @@ async def submit_task(
 @router.get(
     "/sessions/{session_id}/events",
     response_model=list[AgentEventResponse],
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def list_events(
     session_id: str,
@@ -199,7 +199,7 @@ async def list_events(
 
 @router.get(
     "/sessions/{session_id}/events/stream",
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def stream_events(
     session_id: str,
@@ -231,7 +231,7 @@ async def stream_events(
 @router.get(
     "/sessions/{session_id}/approvals",
     response_model=list[ApprovalRequestResponse],
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def list_approvals(
     session_id: str,
@@ -248,7 +248,7 @@ async def list_approvals(
 @router.post(
     "/sessions/{session_id}/approvals/{approval_id}",
     response_model=ApprovalRequestResponse,
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def decide_approval(
     session_id: str,
@@ -283,7 +283,7 @@ async def decide_approval(
 @router.get(
     "/sessions/{session_id}/state",
     response_model=AgentStateResponse,
-    responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def get_session_state(
     session_id: str,

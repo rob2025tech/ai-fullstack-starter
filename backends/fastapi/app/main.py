@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.agent.repository import AgentRepository
 from app.config.settings import Settings, settings
 from app.core.errors import BackendError
 from app.learning.repository import InMemoryLearningRepository
@@ -10,7 +11,7 @@ from app.models.error_models import Error, ErrorResponse
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.policy import ProviderPolicy, ProviderPolicyConfig
 from app.providers.llm.registry import build_llm_provider
-from app.routers import chat, health, learning
+from app.routers import agent, chat, health, learning
 from app.learning.service import LearningService
 from app.services.chat_service import ChatService
 from app.services.teaching_service import TeachingService
@@ -23,6 +24,7 @@ def _error_body(code: str, message: str) -> dict:
 def create_app(
     app_settings: Settings | None = None,
     llm_provider_override: LLMProvider | None = None,
+    agent_repository_override: AgentRepository | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application.
 
@@ -34,6 +36,10 @@ def create_app(
         If provided, use this ``LLMProvider`` instead of calling
         ``build_llm_provider``.  Intended for integration tests that need
         to inject a specific provider (e.g. a failing stub).
+    agent_repository_override:
+        If provided, use this ``AgentRepository`` instance instead of creating
+        a fresh in-memory one.  Useful for tests that need a file-backed or
+        pre-populated repository.
     """
     app_settings = app_settings or settings
     app = FastAPI(
@@ -64,9 +70,14 @@ def create_app(
         InMemoryLearningRepository(),
         app.state.teaching_service,
     )
+    app.state.agent_repository = (
+        agent_repository_override if agent_repository_override is not None
+        else AgentRepository()
+    )
     app.include_router(health.router)
     app.include_router(chat.router)
     app.include_router(learning.router)
+    app.include_router(agent.router)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
