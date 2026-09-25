@@ -28,3 +28,10 @@
 - **Files:** 7 (+658/-17)
 - **Duration:** 449ss
 - **Approach:** Introduced ProviderPolicy as a thin reliability wrapper around LLMProvider.generate. ProviderPolicyConfig (dataclass with __post_init__ validation) holds timeout_seconds, max_retries, and max_payload_bytes. ProviderPolicy.generate enforces: (1) UTF-8 byte size check before any I/O, (2) asyncio.wait_for timeout, (3) ProviderUnavailableError retry up to max_retries, (4) no retry for ProviderError or InvalidRequestError, (5) bare-exception normalisation to ProviderError. ChatService and TeachingService constructors changed to accept ProviderPolicy; streaming path kept unchanged via policy.provider accessor. create_app gained an llm_provider_override parameter for test injection. Settings gained three new fields with safe defaults.
+
+## WO-004: User Story: WO-004 - Fail closed production backend settings
+- **Status:** completed
+- **Commit:** `905f4fa`
+- **Files:** 6 (+373/-7)
+- **Duration:** 419ss
+- **Approach:** Added a Pydantic v2 model_validator(mode='after') to Settings that fires only when deployment_mode='production'. The validator accumulates all violations (missing SESSION_SECRET, empty/wildcard CORS_ORIGINS, missing OPENAI_API_KEY for openai provider) and raises a single ValueError listing all offending setting names before create_app wires any middleware or routes. Local mode is completely unaffected — no secrets are required. Whitespace-only values are treated as absent. The existing session module's own check is preserved as defense-in-depth for shared-demo mode.
