@@ -63,3 +63,10 @@
 - **Files:** 4 (+165/-11)
 - **Duration:** 271ss
 - **Approach:** Made the smallest composition-root change: added AgentRepository import and agent router import to main.py, instantiated AgentRepository() (defaults to :memory: for per-call isolation) on app.state.agent_repository, and added app.include_router(agent.router) after the existing three routers. Added an optional agent_repository_override parameter to create_app() for test injection without changing the default call. Updated all 8 agent route response declarations to include 401 to match the canonical spec. Added AgentSseEvent to DOC_ONLY_SCHEMAS since the SSE stream endpoint returns StreamingResponse with no typed model and FastAPI does not auto-emit that schema.
+
+## WO-008: User Story: WO-008 - Add workspace inspection tools
+- **Status:** completed
+- **Commit:** `610b534`
+- **Files:** 2 (+571/-0)
+- **Duration:** 546ss
+- **Approach:** Implemented WorkspacePolicy as a dataclass that resolves the workspace root once via pathlib.Path.resolve and exposes resolve_safe() which (1) normalizes paths via os.path.normpath to catch traversal before following symlinks, then (2) calls Path.resolve() to follow symlinks and re-checks the result stays within root. RepositoryTreeTool and FileReadTool are factory functions (PascalCase per AC) that return ToolDefinition instances with closures capturing the policy. Both are ToolRisk.read_only. The file.read tool rejects directories, oversized files, and non-UTF-8 content with structured error details.
