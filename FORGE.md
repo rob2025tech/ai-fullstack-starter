@@ -35,3 +35,10 @@
 - **Files:** 6 (+373/-7)
 - **Duration:** 419ss
 - **Approach:** Added a Pydantic v2 model_validator(mode='after') to Settings that fires only when deployment_mode='production'. The validator accumulates all violations (missing SESSION_SECRET, empty/wildcard CORS_ORIGINS, missing OPENAI_API_KEY for openai provider) and raises a single ValueError listing all offending setting names before create_app wires any middleware or routes. Local mode is completely unaffected — no secrets are required. Whitespace-only values are treated as absent. The existing session module's own check is preserved as defense-in-depth for shared-demo mode.
+
+## WO-005: User Story: WO-005 - Validate FastAPI lockfile workflow
+- **Status:** completed
+- **Commit:** `7b45efc`
+- **Files:** 2 (+255/-0)
+- **Duration:** 220ss
+- **Approach:** Inspected pyproject.toml and requirements-lock.txt first and confirmed all declared runtime and dev dependencies were already exactly pinned. Created test_requirements_lock.py using stdlib tomllib (with tomli fallback for Python 3.10 CI environments). The test normalizes package names with PEP 503 rules (lowercase, collapse [-_.] to hyphen) then asserts: all runtime deps pinned ==, all dev deps pinned == or in _DEV_EXCLUSIONS set, the 9 AC-required packages are pinned, no range pins for declared packages, no editable installs, and pinned versions satisfy declared lower bounds. Updated README with a titled 'Deterministic dependency lock workflow' section covering all four required command groups.

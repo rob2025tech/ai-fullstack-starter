@@ -80,6 +80,61 @@ validation error before `create_app` wires any middleware or routes if:
 The mock provider does not require `OPENAI_API_KEY` even in production
 mode; use it to stage a deployment without live AI credentials.
 
+## Deterministic dependency lock workflow
+
+Runtime and dev dependencies are declared with lower-bound ranges in
+`pyproject.toml` and pinned to exact versions in `requirements-lock.txt`.
+This keeps installs reproducible without tying them to a heavyweight
+package manager.
+
+### Install from the lock (normal setup)
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-lock.txt
+```
+
+### Update a dependency
+
+1. Edit the version specifier in `pyproject.toml`.
+2. Regenerate the lock file (requires `pip-compile` from `pip-tools`):
+
+```bash
+# Install pip-tools once (not in the lock — used only for lock regeneration)
+.venv/bin/pip install pip-tools
+
+# Regenerate — captures all transitive pins
+.venv/bin/pip-compile pyproject.toml \
+    --extra dev \
+    --output-file requirements-lock.txt \
+    --strip-extras
+```
+
+3. Validate the new lock:
+
+```bash
+.venv/bin/pytest tests/test_requirements_lock.py -v
+```
+
+4. Re-install from the updated lock and run the full suite:
+
+```bash
+.venv/bin/pip install -r requirements-lock.txt
+.venv/bin/pytest
+```
+
+5. Commit both `pyproject.toml` and `requirements-lock.txt` together.
+
+### Validate the current lock without regenerating
+
+```bash
+.venv/bin/pytest tests/test_requirements_lock.py -v
+```
+
+The test reads `pyproject.toml` and `requirements-lock.txt`, normalizes
+package names (PEP 503), and fails with the name of any declared package
+that is missing or not exactly pinned.
+
 ## Contract obligations
 
 - Errors always use the `{error: {code, message}}` envelope with codes
