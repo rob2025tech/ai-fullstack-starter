@@ -98,3 +98,10 @@
 - **Files:** 10 (+994/-1)
 - **Duration:** 576ss
 - **Approach:** Created task-scoped event endpoints in a new agent_events.py router with GET /sessions/{session_id}/tasks/{task_id}/events (JSON replay returning AgentEventReplayResponse with events list and next_after_sequence pagination cursor) and GET /sessions/{session_id}/tasks/{task_id}/events/stream (SSE snapshot replay). Router reads the persisted AgentEvent store via app.state.agent_repository, validates session and task existence before streaming, and loads the event snapshot before starting the SSE generator so validation errors surface as JSON envelopes. Extended the OpenAPI spec with two new paths, AgentEventReplayResponse schema, and agent_started in the AgentEventResponse event_type enum. Added agentStreamEvents constants to the TypeScript index. Created deterministic fixtures with 6 event types covering the full lifecycle. All 33 new tests pass; contract drift and chat/learning regressions verified clean.
+
+## WO-014: User Story: WO-014 - Add web agent workspace workflow
+- **Status:** completed
+- **Commit:** `c4892a4`
+- **Files:** 6 (+1378/-0)
+- **Duration:** 537ss
+- **Approach:** Extended apps/web/lib/api.ts with six typed agent API helpers (createAgentSession, getAgentSession, submitAgentTask, submitAgentApproval, getAgentEvents, streamAgentEvents) following the existing ContractError pattern. Reused createSseParser from sse.ts for SSE frame parsing in streamAgentEvents. Created apps/web/components/agent-workspace.tsx as a 'use client' React component with local state for session/task lifecycle, ordered event timeline keyed by sequence, pending approval cards with approve/reject buttons deduplicated by approval_id, and a terminal result section for completed/error outcomes. Replay-before-stream pattern: getAgentEvents loads prior events before opening the live SSE stream. Added AgentWorkspace additively to page.tsx in a collapsible section above the existing Chat section. Created deterministic fixtures (6 events, sequences 1-6) and test files for api helpers and component pure helpers.

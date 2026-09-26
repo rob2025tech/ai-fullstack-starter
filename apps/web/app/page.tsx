@@ -1,3 +1,4 @@
+import AgentWorkspace from "@/components/agent-workspace";
 import Chat from "@/components/chat";
 import RetentionQuiz from "@/components/retention-quiz";
 
@@ -22,6 +23,18 @@ export default function Home() {
       <RetentionQuiz />
 
       <section className="mt-12 w-full max-w-5xl border-t border-black/10 pt-8">
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-black/60">
+            Agent workspace
+          </summary>
+
+          <div className="mt-5 flex justify-center">
+            <AgentWorkspace />
+          </div>
+        </details>
+      </section>
+
+      <section className="mt-8 w-full max-w-5xl border-t border-black/10 pt-8">
         <details>
           <summary className="cursor-pointer text-sm font-medium text-black/60">
             Existing AI chat
