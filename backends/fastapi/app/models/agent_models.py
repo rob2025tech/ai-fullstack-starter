@@ -48,6 +48,7 @@ AgentEventType = Literal[
     "error",
     "completed",
     "task_accepted",
+    "agent_started",
 ]
 ApprovalStatus = Literal["pending", "approved", "rejected", "expired", "consumed"]
 

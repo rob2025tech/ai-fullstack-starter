@@ -702,6 +702,50 @@ class AgentRepository:
         """Return the approval request or ``None`` if not found."""
         return self._get_approval(approval_id)
 
+    def find_approved_approval(
+        self,
+        session_id: str,
+        task_id: str,
+        action_fingerprint: str,
+    ) -> "ApprovalRequest | None":
+        """Return the oldest approved approval matching session, task, and fingerprint.
+
+        Used by AgentLoop to check whether a mutating/unsafe action has already
+        been authorized before attempting to consume it.
+        """
+        row = self._db.execute(
+            """
+            SELECT * FROM approval_requests
+            WHERE session_id = ? AND task_id = ? AND action_fingerprint = ? AND status = 'approved'
+            ORDER BY created_at
+            LIMIT 1
+            """,
+            (session_id, task_id, action_fingerprint),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_approval(row)
+
+    def find_next_runnable_task(self) -> "AgentTask | None":
+        """Return the oldest pending task across all sessions, or ``None``.
+
+        Used by LocalAgentWorker to claim the next unit of work.
+        """
+        row = self._db.execute(
+            "SELECT * FROM agent_tasks WHERE status = 'pending' ORDER BY created_at LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        return AgentTask(
+            task_id=row["task_id"],
+            session_id=row["session_id"],
+            status=row["status"],
+            prompt=row["prompt"],
+            result=row["result"],
+            created_at=_from_iso(row["created_at"]),
+            updated_at=_from_iso(row["updated_at"]),
+        )
+
     def expire_pending_before(self, cutoff_time: datetime) -> int:
         """Mark all pending or approved approvals whose ``expires_at`` is before *cutoff_time* as expired.
 

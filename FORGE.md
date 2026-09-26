@@ -84,3 +84,10 @@
 - **Files:** 4 (+830/-0)
 - **Duration:** 555ss
 - **Approach:** Created ApprovalService in backends/fastapi/app/agent/approvals.py with canonical SHA-256 action fingerprinting, injectable clock for deterministic tests, and four methods: request_approval (creates pending record + audit event), decide (idempotent approve/reject + event), expire_due_approvals (demand-driven sweep), and consume_approval (atomic binding-verified exact-once transition). Extended AgentRepository with public get_approval wrapper and expire_pending_before that sweeps both pending AND approved records past their TTL. Wired ApprovalService onto app.state in main.py. All 32 tests pass.
+
+## WO-012: User Story: WO-012 - Implement bounded agent execution loop
+- **Status:** completed
+- **Commit:** `f16ac6d`
+- **Files:** 8 (+1848/-0)
+- **Duration:** 648ss
+- **Approach:** Created AgentLoop in loop.py with a simple JSON intent protocol ({intent: tool_call/final_answer}), configurable AgentLoopConfig (max_iterations, max_tool_calls, task_timeout_seconds), injectable clock for deterministic timeout tests, and structured event emission aligned to the existing contract event types. Loop handles all error paths (provider unavailable, provider error, malformed response, unknown tool, tool invocation error, approval gate, all three limits) with structured 'error' events and terminal task status updates. Created LocalAgentWorker in worker.py with run_once() (claims oldest pending task) and run_task() (targets a specific task). Extended AgentRepository with find_approved_approval() and find_next_runnable_task() helpers. Updated AgentLoopConfig, ApprovalService, and ToolRegistry onto app.state in main.py. Added 'agent_started' to AgentEventType in agent_models.py (additive contract extension). All 28 new tests pass; 3 pre-existing failures are unaffected.

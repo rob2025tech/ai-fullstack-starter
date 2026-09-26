@@ -4,7 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.agent.approvals import ApprovalService
+from app.agent.loop import AgentLoop, AgentLoopConfig
 from app.agent.repository import AgentRepository
+from app.agent.tools.registry import ToolRegistry
+from app.agent.worker import LocalAgentWorker
 from app.config.settings import Settings, settings
 from app.core.errors import BackendError
 from app.learning.repository import InMemoryLearningRepository
@@ -76,6 +79,16 @@ def create_app(
         else AgentRepository()
     )
     app.state.approval_service = ApprovalService(app.state.agent_repository)
+    app.state.tool_registry = ToolRegistry()
+    agent_loop = AgentLoop(
+        provider=policy,
+        registry=app.state.tool_registry,
+        approval_service=app.state.approval_service,
+        repo=app.state.agent_repository,
+        config=AgentLoopConfig(),
+    )
+    app.state.agent_loop = agent_loop
+    app.state.agent_worker = LocalAgentWorker(agent_loop, app.state.agent_repository)
     app.include_router(health.router)
     app.include_router(chat.router)
     app.include_router(learning.router)
