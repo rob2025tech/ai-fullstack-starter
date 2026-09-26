@@ -623,6 +623,96 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events:
+    get:
+      operationId: listTaskEvents
+      tags: [agent]
+      summary: List ordered events for a specific agent task
+      description: |
+        Returns persisted events for *task_id* sorted by monotonic sequence
+        number. Supports pagination via `after_sequence`.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Return only events with sequence greater than this value.
+      responses:
+        "200":
+          description: Ordered list of task events with optional pagination cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentEventReplayResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream:
+    get:
+      operationId: streamTaskEvents
+      tags: [agent]
+      summary: Stream events for a specific agent task as SSE
+      description: |
+        Returns a `text/event-stream` response replaying all persisted events
+        for *task_id*. Each SSE frame uses the `event_type` as the event name
+        and a JSON-serialised `AgentEventResponse` as the data payload.
+        The stream closes after all current events are emitted.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Replay events from after this sequence number.
+      responses:
+        "200":
+          description: |
+            SSE event stream for the task. Each frame has:
+            - event: the event_type (e.g. assistant_output, completed)
+            - data: JSON-serialised AgentEventResponse
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE event stream. Closes after all current events are emitted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/agent/sessions/{session_id}/state:
     get:
       operationId: getAgentState
@@ -1276,6 +1366,7 @@ components:
             - error
             - completed
             - task_accepted
+            - agent_started
           description: |
             Discriminant for the event payload:
             - `assistant_output`: LLM-generated text fragment or plan step.
@@ -1297,6 +1388,25 @@ components:
           type: string
           format: date-time
           description: ISO 8601 timestamp when the event was persisted.
+
+    AgentEventReplayResponse:
+      type: object
+      required: [events]
+      description: |
+        Paginated replay response for task-scoped event queries.
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentEventResponse"
+          description: Events in ascending sequence order.
+        next_after_sequence:
+          type: [integer, "null"]
+          minimum: 0
+          description: |
+            The sequence number of the last returned event; pass as
+            `after_sequence` to retrieve subsequent pages. Null when the
+            result set is empty or there are no further pages.
 
     ApprovalRequestResponse:
       type: object

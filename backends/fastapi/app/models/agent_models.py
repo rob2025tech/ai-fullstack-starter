@@ -96,6 +96,11 @@ class ApprovalRequestResponse(BaseModel):
     updated_at: datetime
 
 
+class AgentEventReplayResponse(BaseModel):
+    events: list[AgentEventResponse]
+    next_after_sequence: int | None = None
+
+
 class AgentStateResponse(BaseModel):
     session_id: str
     session: AgentSessionResponse

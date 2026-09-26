@@ -15,7 +15,7 @@ from app.models.error_models import Error, ErrorResponse
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.policy import ProviderPolicy, ProviderPolicyConfig
 from app.providers.llm.registry import build_llm_provider
-from app.routers import agent, chat, health, learning
+from app.routers import agent, agent_events, chat, health, learning
 from app.learning.service import LearningService
 from app.services.chat_service import ChatService
 from app.services.teaching_service import TeachingService
@@ -93,6 +93,7 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(learning.router)
     app.include_router(agent.router)
+    app.include_router(agent_events.router)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

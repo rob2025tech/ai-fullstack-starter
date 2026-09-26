@@ -91,3 +91,10 @@
 - **Files:** 8 (+1848/-0)
 - **Duration:** 648ss
 - **Approach:** Created AgentLoop in loop.py with a simple JSON intent protocol ({intent: tool_call/final_answer}), configurable AgentLoopConfig (max_iterations, max_tool_calls, task_timeout_seconds), injectable clock for deterministic timeout tests, and structured event emission aligned to the existing contract event types. Loop handles all error paths (provider unavailable, provider error, malformed response, unknown tool, tool invocation error, approval gate, all three limits) with structured 'error' events and terminal task status updates. Created LocalAgentWorker in worker.py with run_once() (claims oldest pending task) and run_task() (targets a specific task). Extended AgentRepository with find_approved_approval() and find_next_runnable_task() helpers. Updated AgentLoopConfig, ApprovalService, and ToolRegistry onto app.state in main.py. Added 'agent_started' to AgentEventType in agent_models.py (additive contract extension). All 28 new tests pass; 3 pre-existing failures are unaffected.
+
+## WO-013: User Story: WO-013 - Stream and replay agent events
+- **Status:** completed
+- **Commit:** `e28c581`
+- **Files:** 10 (+994/-1)
+- **Duration:** 576ss
+- **Approach:** Created task-scoped event endpoints in a new agent_events.py router with GET /sessions/{session_id}/tasks/{task_id}/events (JSON replay returning AgentEventReplayResponse with events list and next_after_sequence pagination cursor) and GET /sessions/{session_id}/tasks/{task_id}/events/stream (SSE snapshot replay). Router reads the persisted AgentEvent store via app.state.agent_repository, validates session and task existence before streaming, and loads the event snapshot before starting the SSE generator so validation errors surface as JSON envelopes. Extended the OpenAPI spec with two new paths, AgentEventReplayResponse schema, and agent_started in the AgentEventResponse event_type enum. Added agentStreamEvents constants to the TypeScript index. Created deterministic fixtures with 6 event types covering the full lifecycle. All 33 new tests pass; contract drift and chat/learning regressions verified clean.
