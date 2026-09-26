@@ -3,20 +3,22 @@ from uuid import uuid4
 
 from app.models.request_models import ChatRequest
 from app.models.response_models import ChatMessage, ChatResponse
-from app.providers.llm.base import LLMProvider
+from app.providers.llm.policy import ProviderPolicy
 
 
 class ChatService:
-    def __init__(self, provider: LLMProvider) -> None:
-        self.provider = provider
+    def __init__(self, policy: ProviderPolicy) -> None:
+        self._policy = policy
 
     async def complete(self, request: ChatRequest) -> ChatResponse:
-        content = await self.provider.generate(request.prompt)
+        """Generate a chat completion via the provider policy boundary."""
+        content = await self._policy.generate(request.prompt)
         return self._build_response(content)
 
     async def stream_events(self, request: ChatRequest) -> AsyncIterator[tuple[str, dict]]:
+        """Stream chat events using the raw provider (streaming policy is out of scope)."""
         parts: list[str] = []
-        async for chunk in self.provider.stream(request.prompt):
+        async for chunk in self._policy.provider.stream(request.prompt):
             parts.append(chunk)
             yield "delta", {"content": chunk}
         yield "message", self._build_response("".join(parts)).model_dump(mode="json")
