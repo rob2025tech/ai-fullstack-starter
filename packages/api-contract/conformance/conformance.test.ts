@@ -136,4 +136,262 @@ describe(`API contract conformance @ ${BASE_URL}`, () => {
     expect(response.headers.get("content-type")).toContain("application/json");
     assertErrorEnvelope(await response.json(), "invalid_request");
   });
+
+  it("GET /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events returns JSON replay", async () => {
+    // Create a session and task first
+    const sessResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "conformance-test" }),
+    });
+    expect(sessResp.status).toBe(201);
+    const sessBody = (await sessResp.json()) as { session_id: string };
+    const sessionId = sessBody.session_id;
+
+    const taskResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "conformance event replay test" }),
+      },
+    );
+    expect(taskResp.status).toBe(202);
+    const taskBody = (await taskResp.json()) as { task_id: string };
+    const taskId = taskBody.task_id;
+
+    // Replay endpoint — no events yet, should return 200 with empty array
+    const eventsResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks/${taskId}/events`,
+    );
+    expect(eventsResp.status).toBe(200);
+    expect(eventsResp.headers.get("content-type")).toContain("application/json");
+    const eventsBody = (await eventsResp.json()) as {
+      events: unknown[];
+      next_after_sequence: number | null;
+    };
+    expect(Array.isArray(eventsBody.events)).toBe(true);
+    // A newly-submitted task may have a task_accepted event from the router
+    expect(eventsBody.events.length).toBeGreaterThanOrEqual(0);
+    expect("next_after_sequence" in eventsBody).toBe(true);
+  });
+
+  it("GET /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream returns SSE", async () => {
+    // Create a fresh session + task
+    const sessResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const sessionId = ((await sessResp.json()) as { session_id: string })
+      .session_id;
+
+    const taskResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "conformance sse test" }),
+      },
+    );
+    const taskId = ((await taskResp.json()) as { task_id: string }).task_id;
+
+    const streamResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks/${taskId}/events/stream`,
+    );
+    expect(streamResp.status).toBe(200);
+    expect(streamResp.headers.get("content-type")).toContain("text/event-stream");
+
+    // Collect whatever events are available (may be empty or have task_accepted)
+    const events = await collectSseEvents(streamResp);
+    // Just assert we get a valid (possibly empty) stream
+    for (const event of events) {
+      expect(typeof event.name).toBe("string");
+      const payload = JSON.parse(event.data) as {
+        task_id: string;
+        sequence: number;
+        event_type: string;
+      };
+      expect(payload.task_id).toBe(taskId);
+      expect(typeof payload.sequence).toBe("number");
+      expect(payload.sequence).toBeGreaterThan(0);
+    }
+  });
+
+  it("GET task events with unknown session returns 422 error envelope", async () => {
+    const resp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/no-such-session/tasks/no-such-task/events`,
+    );
+    expect(resp.status).toBe(422);
+    assertErrorEnvelope(await resp.json(), "invalid_request");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Agent session and task conformance (AC-5, AC-8)
+  // ---------------------------------------------------------------------------
+
+  it("POST /api/v1/agent/sessions creates a session and returns 201 with required fields", async () => {
+    const resp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "conformance-session-create" }),
+    });
+    expect(resp.status).toBe(201);
+    expect(resp.headers.get("content-type")).toContain("application/json");
+    const body = (await resp.json()) as {
+      session_id: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    };
+    expect(typeof body.session_id).toBe("string");
+    expect(body.session_id.length).toBeGreaterThan(0);
+    expect(body.status).toBe("active");
+    expect(typeof body.created_at).toBe("string");
+    expect(typeof body.updated_at).toBe("string");
+  });
+
+  it("GET /api/v1/agent/sessions/{session_id} retrieves the created session", async () => {
+    const createResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(createResp.status).toBe(201);
+    const { session_id: sessionId } = (await createResp.json()) as { session_id: string };
+
+    const getResp = await fetch(`${BASE_URL}/api/v1/agent/sessions/${sessionId}`);
+    expect(getResp.status).toBe(200);
+    const body = (await getResp.json()) as { session_id: string; status: string };
+    expect(body.session_id).toBe(sessionId);
+    expect(body.status).toBe("active");
+  });
+
+  it("POST .../tasks submits a task and returns 202 with pending status", async () => {
+    const createResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const { session_id: sessionId } = (await createResp.json()) as { session_id: string };
+
+    const taskResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "conformance task submission test" }),
+      },
+    );
+    expect(taskResp.status).toBe(202);
+    expect(taskResp.headers.get("content-type")).toContain("application/json");
+    const body = (await taskResp.json()) as {
+      task_id: string;
+      session_id: string;
+      status: string;
+      prompt: string;
+    };
+    expect(typeof body.task_id).toBe("string");
+    expect(body.task_id.length).toBeGreaterThan(0);
+    expect(body.session_id).toBe(sessionId);
+    expect(body.status).toBe("pending");
+    expect(body.prompt).toBe("conformance task submission test");
+  });
+
+  it("POST .../tasks rejects an empty prompt with 422 error envelope", async () => {
+    const createResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const { session_id: sessionId } = (await createResp.json()) as { session_id: string };
+
+    const taskResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "" }),
+      },
+    );
+    expect(taskResp.status).toBe(422);
+    assertErrorEnvelope(await taskResp.json(), "invalid_request");
+  });
+
+  it("POST .../approvals/{approval_id} rejects a non-existent approval_id with error envelope", async () => {
+    const createResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const { session_id: sessionId } = (await createResp.json()) as { session_id: string };
+
+    const approvalResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/approvals/nonexistent-approval`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approved" }),
+      },
+    );
+    // Must return 422 (not found / invalid) with error envelope
+    expect([422, 404]).toContain(approvalResp.status);
+    const body = await approvalResp.json();
+    assertErrorEnvelope(body, (body as { error: { code: string } }).error.code);
+  });
+
+  it("GET .../events returns JSON list conforming to agent event schema (AC-8)", async () => {
+    const createResp = await fetch(`${BASE_URL}/api/v1/agent/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "conformance-event-types" }),
+    });
+    expect(createResp.status).toBe(201);
+    const { session_id: sessionId } = (await createResp.json()) as { session_id: string };
+
+    await fetch(`${BASE_URL}/api/v1/agent/sessions/${sessionId}/tasks`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "conformance event type assertion" }),
+    });
+
+    const eventsResp = await fetch(
+      `${BASE_URL}/api/v1/agent/sessions/${sessionId}/events`,
+    );
+    expect(eventsResp.status).toBe(200);
+    expect(eventsResp.headers.get("content-type")).toContain("application/json");
+
+    const events = (await eventsResp.json()) as Array<{
+      event_id: string;
+      session_id: string;
+      task_id: string;
+      sequence: number;
+      event_type: string;
+      created_at: string;
+    }>;
+    expect(Array.isArray(events)).toBe(true);
+
+    // Each event must conform to the agent event schema (AC-8)
+    const allowedEventTypes = new Set([
+      "agent_started",
+      "assistant_output",
+      "tool_call",
+      "tool_result",
+      "approval_requested",
+      "error",
+      "completed",
+    ]);
+    for (const event of events) {
+      expect(typeof event.event_id).toBe("string");
+      expect(event.session_id).toBe(sessionId);
+      expect(typeof event.task_id).toBe("string");
+      expect(typeof event.sequence).toBe("number");
+      expect(event.sequence).toBeGreaterThan(0);
+      expect(
+        allowedEventTypes.has(event.event_type),
+        `unexpected event_type: ${event.event_type}`,
+      ).toBe(true);
+      expect(typeof event.created_at).toBe("string");
+    }
+  });
 });

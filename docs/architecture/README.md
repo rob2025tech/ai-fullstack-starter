@@ -20,3 +20,4 @@ Superseded ADRs are kept, marked, and linked to their replacement.
 | [ADR-004](adr-004-no-auth-in-v1.md) | No authentication in v1 | Accepted |
 | [ADR-005](adr-005-monorepo-layout-and-tooling.md) | Monorepo layout and tooling | Accepted |
 | [ADR-006](adr-006-mobile-json-mode-day-1.md) | Mobile client consumes JSON mode on day 1 | Accepted |
+| [ADR-007](adr-007-hosted-agent-auth.md) | Hosted agent authentication and deployment-mode trust boundaries | Accepted |

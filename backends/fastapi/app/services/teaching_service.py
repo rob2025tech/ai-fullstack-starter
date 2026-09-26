@@ -1,13 +1,19 @@
-from app.core.errors import ProviderError, ProviderUnavailableError
+from app.core.errors import BackendError
 from app.learning.teaching import TeachingResponse, generate_teaching
-from app.providers.llm.base import LLMProvider
+from app.providers.llm.policy import ProviderPolicy
 
 
 class TeachingService:
-    """Generate adaptive teaching with deterministic fallback."""
+    """Generate adaptive teaching with deterministic fallback.
 
-    def __init__(self, provider: LLMProvider | None = None) -> None:
-        self.provider = provider
+    When a ``ProviderPolicy`` is supplied, the service attempts an LLM-enhanced
+    explanation.  Any ``BackendError`` (timeout, unavailability, payload limit,
+    or provider failure) causes the service to return the deterministic fallback
+    instead of propagating the error, because teaching enhancements are optional.
+    """
+
+    def __init__(self, policy: ProviderPolicy | None = None) -> None:
+        self._policy = policy
 
     async def generate(
         self,
@@ -18,14 +24,16 @@ class TeachingService:
         if fallback is None:
             return None
 
-        if self.provider is None:
+        if self._policy is None:
             return fallback
 
         prompt = self._build_prompt(concept, misconception)
 
         try:
-            explanation = await self.provider.generate(prompt)
-        except (ProviderError, ProviderUnavailableError):
+            explanation = await self._policy.generate(prompt)
+        except BackendError:
+            # All provider-policy failures are non-fatal for teaching enrichment;
+            # return the deterministic template instead.
             return fallback
 
         return TeachingResponse(
