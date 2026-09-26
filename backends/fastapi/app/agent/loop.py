@@ -589,20 +589,12 @@ class AgentLoop:
                     tool_calls=tool_calls,
                 )
 
-        # No approved approval — create a pending request and stop
-        approval = self._approval_service.request_approval(
+        # No approved approval — create a pending request and stop.
+        # ApprovalService.request_approval emits the single canonical
+        # approval_requested audit event (approval_id, tool_name, risk,
+        # fingerprint, expires_at); the loop must not emit a duplicate.
+        self._approval_service.request_approval(
             session_id, task_id, tool_name, risk.value, tool_input
-        )
-        self._emit_event(
-            session_id,
-            task_id,
-            "approval_requested",
-            {
-                "approval_id": approval.approval_id,
-                "tool_name": tool_name,
-                "risk": risk.value,
-                "fingerprint": fingerprint,
-            },
         )
         self._repo.update_task_status(task_id, "blocked", result="approval_requested")
         return AgentLoopResult(

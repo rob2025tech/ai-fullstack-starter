@@ -249,6 +249,7 @@ class ApprovalService:
                 "approval_id": approval_id,
                 "tool_name": tool_name,
                 "risk": risk,
+                "fingerprint": fingerprint,
                 "expires_at": expires_at.isoformat(),
             },
         )
