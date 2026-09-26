@@ -113,6 +113,14 @@ describe("agent contract paths", () => {
     expect(learningPaths.length).toBeGreaterThan(0);
   });
 
+  it("preserves /api/v1/learning/quiz/retest path (GET and POST)", () => {
+    expect(paths).toHaveProperty("/api/v1/learning/quiz/retest");
+    const pathItem = paths["/api/v1/learning/quiz/retest"] as Record<string, unknown>;
+    // Must support at least GET (fresh question) or POST (evaluate answer)
+    const hasMethods = "get" in pathItem || "post" in pathItem;
+    expect(hasMethods, "/api/v1/learning/quiz/retest must have GET or POST").toBe(true);
+  });
+
   // --- New agent paths ---
 
   it("exposes POST /api/v1/agent/sessions (createAgentSession)", () => {
@@ -187,6 +195,41 @@ describe("agent contract paths", () => {
     expect(
       hasResponseRef(op, "500", "#/components/responses/InternalError"),
     ).toBe(true);
+  });
+
+  it("exposes GET /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events (task-scoped replay)", () => {
+    expect(paths).toHaveProperty(
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events",
+    );
+    const op = getOp(
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events",
+      "get",
+    );
+    // Task-scoped endpoint must return 200 with paginated event list
+    const res = op.responses as Record<string, unknown> | undefined;
+    expect(res).toHaveProperty("200");
+    expect(
+      hasResponseRef(op, "422", "#/components/responses/InvalidRequest"),
+    ).toBe(true);
+    expect(
+      hasResponseRef(op, "500", "#/components/responses/InternalError"),
+    ).toBe(true);
+  });
+
+  it("exposes GET /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream (task-scoped SSE)", () => {
+    expect(paths).toHaveProperty(
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream",
+    );
+    const op = getOp(
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream",
+      "get",
+    );
+    const res200 = (op.responses as Record<string, unknown>)["200"] as Record<
+      string,
+      unknown
+    > | undefined;
+    const content = res200?.content as Record<string, unknown> | undefined;
+    expect(content).toHaveProperty("text/event-stream");
   });
 
   it("exposes GET /api/v1/agent/sessions/{session_id}/events/stream (streamAgentEvents)", () => {
