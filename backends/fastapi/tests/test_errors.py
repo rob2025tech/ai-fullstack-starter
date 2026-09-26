@@ -1,6 +1,10 @@
 import json
 
+from fastapi.testclient import TestClient
+
+from app.config.settings import Settings
 from app.core.errors import ProviderError
+from app.main import create_app
 from app.providers.llm.base import LLMProvider
 from tests.sse_util import parse_sse
 
@@ -28,8 +32,8 @@ def test_missing_body_is_rejected_with_envelope(client):
     assert response.json()["error"]["code"] == "invalid_request"
 
 
-def test_provider_error_maps_to_envelope(client):
-    client.app.state.chat_service.provider = FailingProvider()
+def test_provider_error_maps_to_envelope():
+    client = TestClient(create_app(Settings(_env_file=None), llm_provider_override=FailingProvider()))
     response = client.post("/api/v1/chat", json={"prompt": "ping"})
     assert response.status_code == 502
     assert response.json() == {
@@ -37,8 +41,8 @@ def test_provider_error_maps_to_envelope(client):
     }
 
 
-def test_provider_error_becomes_terminal_sse_event(client):
-    client.app.state.chat_service.provider = FailingProvider()
+def test_provider_error_becomes_terminal_sse_event():
+    client = TestClient(create_app(Settings(_env_file=None), llm_provider_override=FailingProvider()))
     response = client.post("/api/v1/chat", json={"prompt": "ping", "stream": True})
     assert response.status_code == 200
     events = parse_sse(response.text)
