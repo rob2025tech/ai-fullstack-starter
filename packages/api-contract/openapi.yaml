@@ -29,6 +29,11 @@ tags:
     description: Prompt in, completion out
   - name: learning
     description: Adaptive learning state and answer evaluation
+  - name: agent
+    description: |
+      Agent control plane: sessions, tasks, events, approvals, and
+      consolidated state. Tasks are accepted for execution (202) and
+      progress is observable via event replay or SSE streams.
 
 paths:
   /api/v1/health:
@@ -279,6 +284,352 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningRetestAnswerResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions:
+    post:
+      operationId: createAgentSession
+      tags: [agent]
+      summary: Create an agent session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentSessionRequest"
+      responses:
+        "201":
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}:
+    get:
+      operationId: getAgentSession
+      tags: [agent]
+      summary: Retrieve an agent session
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/tasks:
+    post:
+      operationId: submitAgentTask
+      tags: [agent]
+      summary: Submit a task to an agent session
+      description: |
+        Accepts the task for execution (202) and records a
+        `task_accepted` event. Execution is driven by the backend's
+        agent worker; clients observe progress through the event
+        replay or stream endpoints.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitAgentTaskRequest"
+      responses:
+        "202":
+          description: Task accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentTaskResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/events:
+    get:
+      operationId: listAgentEvents
+      tags: [agent]
+      summary: List agent events for a session
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Only return events with sequence greater than this value.
+      responses:
+        "200":
+          description: Ordered agent events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentEventResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/events/stream:
+    get:
+      operationId: streamAgentEvents
+      tags: [agent]
+      summary: Stream agent events for a session as SSE
+      description: |
+        Responds with `text/event-stream`. Each frame carries an
+        `event` name matching the event_type and a JSON `data`
+        payload shaped as AgentEventResponse. Events already stored
+        before the stream opens are replayed first, honouring
+        `after_sequence`.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: SSE event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE event stream; every event payload is JSON.
+                  - event name: one of the AgentEventResponse
+                    event_type values
+                  - data: AgentEventResponse
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/approvals:
+    get:
+      operationId: listAgentApprovals
+      tags: [agent]
+      summary: List approval requests for a session
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval requests, most recent first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApprovalRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/approvals/{approval_id}:
+    post:
+      operationId: decideAgentApproval
+      tags: [agent]
+      summary: Decide a pending approval request
+      description: |
+        Records an approval decision exactly once: repeating the same
+        decision is idempotent and returns the stored approval without
+        emitting a duplicate `approval_decided` event. Approvals that
+        do not belong to the session are rejected with the error
+        envelope.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: approval_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Approval after the decision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalRequestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/state:
+    get:
+      operationId: getAgentState
+      tags: [agent]
+      summary: Retrieve consolidated state for an agent session
+      description: |
+        Returns the session, its tasks, its full event history, and
+        pending approvals in one snapshot. The endpoint remains
+        readable after an approval has been consumed.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Consolidated session state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentStateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events:
+    get:
+      operationId: listAgentTaskEvents
+      tags: [agent]
+      summary: Replay agent events for a specific task
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Event replay page with continuation cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentEventReplayResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream:
+    get:
+      operationId: streamAgentTaskEvents
+      tags: [agent]
+      summary: Stream agent events for a specific task as SSE
+      description: |
+        Responds with `text/event-stream`. Each frame carries an
+        `event` name matching the event_type and a JSON `data`
+        payload shaped as AgentEventResponse. Stored events are
+        replayed first, honouring `after_sequence`.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: SSE event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE event stream; every event payload is JSON.
+                  - event name: one of the AgentEventResponse
+                    event_type values
+                  - data: AgentEventResponse
         "401":
           $ref: "#/components/responses/Unauthorized"
         "422":
@@ -744,6 +1095,246 @@ components:
           format: date-time
         misconception:
           type: [string, "null"]
+
+    CreateAgentSessionRequest:
+      type: object
+      description: |
+        Request body for creating an agent session. All fields are
+        optional; an empty object creates an untitled session.
+      properties:
+        title:
+          type: [string, "null"]
+        metadata:
+          type: [object, "null"]
+          additionalProperties: true
+          description: Free-form client metadata; additive only.
+
+    SubmitAgentTaskRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          description: The task instruction for the agent.
+        metadata:
+          type: [object, "null"]
+          additionalProperties: true
+
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      description: |
+        Decision for a pending approval request. Re-submitting the
+        same decision is idempotent.
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        rationale:
+          type: [string, "null"]
+
+    AgentSessionResponse:
+      type: object
+      required:
+        - session_id
+        - status
+        - created_at
+        - updated_at
+      properties:
+        session_id:
+          type: string
+        status:
+          type: string
+          enum: [active, idle, completed, error]
+        title:
+          type: [string, "null"]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        metadata:
+          type: [object, "null"]
+          additionalProperties: true
+
+    AgentTaskResponse:
+      type: object
+      required:
+        - task_id
+        - session_id
+        - status
+        - prompt
+        - created_at
+        - updated_at
+      properties:
+        task_id:
+          type: string
+        session_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - cancelled
+            - timed_out
+            - blocked
+          description: |
+            `blocked` means the task is waiting on an approval
+            decision; it resumes after an approved action is
+            consumed.
+        prompt:
+          type: string
+        result:
+          type: [string, "null"]
+          description: Final agent output once the task succeeds.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentEventResponse:
+      type: object
+      required:
+        - event_id
+        - session_id
+        - task_id
+        - sequence
+        - event_type
+        - created_at
+      description: |
+        A single ordered agent event. `sequence` is strictly
+        increasing per task and drives replay cursors.
+      properties:
+        event_id:
+          type: string
+        session_id:
+          type: string
+        task_id:
+          type: string
+        sequence:
+          type: integer
+          minimum: 0
+        event_type:
+          type: string
+          enum:
+            - assistant_output
+            - tool_call
+            - tool_result
+            - approval_requested
+            - approval_decided
+            - approval_consumed
+            - error
+            - completed
+            - task_accepted
+            - agent_started
+          description: |
+            `task_accepted` is recorded when a task is submitted.
+            `approval_decided` is emitted exactly once per decision.
+            `approval_consumed` is emitted when the agent loop
+            resumes and consumes an approved action; event replay
+            and state endpoints remain readable afterwards.
+        payload:
+          type: [object, "null"]
+          additionalProperties: true
+          description: Event-type-specific data; additive only.
+        created_at:
+          type: string
+          format: date-time
+
+    AgentEventReplayResponse:
+      type: object
+      required: [events]
+      description: Event replay page with a continuation cursor.
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentEventResponse"
+        next_after_sequence:
+          type: [integer, "null"]
+          description: |
+            Cursor to pass as `after_sequence` for the next page;
+            null when there are no further events.
+
+    ApprovalRequestResponse:
+      type: object
+      required:
+        - approval_id
+        - session_id
+        - task_id
+        - action_type
+        - action_fingerprint
+        - status
+        - expires_at
+        - created_at
+        - updated_at
+      properties:
+        approval_id:
+          type: string
+        session_id:
+          type: string
+        task_id:
+          type: string
+        action_type:
+          type: string
+          description: Identifier of the action awaiting approval.
+        action_payload:
+          type: [object, "null"]
+          additionalProperties: true
+        action_fingerprint:
+          type: string
+          description: |
+            Stable fingerprint of (session, task, action, input);
+            identical retried actions map to the same approval.
+        status:
+          type: string
+          enum: [pending, approved, rejected, expired, consumed]
+        expires_at:
+          type: string
+          format: date-time
+        consumed_at:
+          type: [string, "null"]
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentStateResponse:
+      type: object
+      required:
+        - session_id
+        - session
+        - tasks
+        - events
+        - pending_approvals
+      description: Consolidated snapshot of an agent session.
+      properties:
+        session_id:
+          type: string
+        session:
+          $ref: "#/components/schemas/AgentSessionResponse"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTaskResponse"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentEventResponse"
+        pending_approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalRequestResponse"
 
     Error:
       type: object

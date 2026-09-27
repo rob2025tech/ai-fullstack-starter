@@ -66,3 +66,76 @@ describe("canonical OpenAPI spec", () => {
     }
   });
 });
+
+describe("agent contract", () => {
+  const paths = spec.paths as Record<string, any>;
+  const schemas = (spec.components as any).schemas as Record<string, any>;
+
+  it("exposes the v1 agent control-plane paths", () => {
+    const expected = [
+      "/api/v1/agent/sessions",
+      "/api/v1/agent/sessions/{session_id}",
+      "/api/v1/agent/sessions/{session_id}/tasks",
+      "/api/v1/agent/sessions/{session_id}/events",
+      "/api/v1/agent/sessions/{session_id}/events/stream",
+      "/api/v1/agent/sessions/{session_id}/approvals",
+      "/api/v1/agent/sessions/{session_id}/approvals/{approval_id}",
+      "/api/v1/agent/sessions/{session_id}/state",
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events",
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream",
+    ];
+    for (const path of expected) {
+      expect(paths, `missing agent path ${path}`).toHaveProperty(path);
+    }
+  });
+
+  it("creates sessions with 201 and accepts tasks with 202", () => {
+    expect(paths["/api/v1/agent/sessions"].post.responses).toHaveProperty("201");
+    expect(paths["/api/v1/agent/sessions/{session_id}/tasks"].post.responses).toHaveProperty("202");
+  });
+
+  it("serves the agent event streams as SSE", () => {
+    for (const stream of [
+      "/api/v1/agent/sessions/{session_id}/events/stream",
+      "/api/v1/agent/sessions/{session_id}/tasks/{task_id}/events/stream",
+    ]) {
+      const ok = paths[stream].get.responses["200"];
+      expect(Object.keys(ok.content), stream).toContain("text/event-stream");
+    }
+  });
+
+  it("pins the full agent event type registry", () => {
+    const eventType = schemas.AgentEventResponse.properties.event_type;
+    expect([...eventType.enum].sort()).toEqual(
+      [
+        "agent_started",
+        "approval_consumed",
+        "approval_decided",
+        "approval_requested",
+        "assistant_output",
+        "completed",
+        "error",
+        "task_accepted",
+        "tool_call",
+        "tool_result",
+      ].sort(),
+    );
+  });
+
+  it("pins the task and approval status registries", () => {
+    expect([...schemas.AgentTaskResponse.properties.status.enum].sort()).toEqual(
+      [
+        "blocked",
+        "cancelled",
+        "failed",
+        "pending",
+        "running",
+        "succeeded",
+        "timed_out",
+      ].sort(),
+    );
+    expect(
+      [...schemas.ApprovalRequestResponse.properties.status.enum].sort(),
+    ).toEqual(["approved", "consumed", "expired", "pending", "rejected"].sort());
+  });
+});
