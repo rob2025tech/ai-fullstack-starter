@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "description": "Deterministic fixture payloads for the agent vertical-slice release-validation suite. Contains no secrets, credentials, or environment-specific configuration.",
+  "sessions": {
+    "primary": {
+      "title": "VS primary session",
+      "metadata": { "env": "test", "suite": "vertical_slice" }
+    },
+    "secondary": {
+      "title": "VS secondary session",
+      "metadata": { "env": "test", "suite": "session_isolation" }
+    }
+  },
+  "tasks": {
+    "happy_path": {
+      "prompt": "Summarise the login module in one sentence."
+    },
+    "tool_call_path": {
+      "prompt": "Read src/auth/login.py and summarise what it does."
+    },
+    "mutating_tool_path": {
+      "prompt": "Refactor the login handler and write the updated file."
+    },
+    "provider_failure_path": {
+      "prompt": "This task will trigger a provider failure for testing purposes."
+    }
+  },
+  "approval_decisions": {
+    "approved": {
+      "decision": "approved"
+    },
+    "rejected": {
+      "decision": "rejected",
+      "rationale": "Action denied by release-validation suite"
+    }
+  },
+  "provider_scripts": {
+    "final_answer": {
+      "description": "Provider returns a direct final answer (no tool calls).",
+      "response": "{\"intent\": \"final_answer\", \"content\": \"The login module handles user authentication.\"}"
+    },
+    "read_only_tool_call": {
+      "description": "Provider requests a read-only file read tool, then gives a final answer.",
+      "responses": [
+        "{\"intent\": \"tool_call\", \"tool_name\": \"file.read\", \"tool_input\": {\"path\": \"src/auth/login.py\"}}",
+        "{\"intent\": \"final_answer\", \"content\": \"Read the file successfully.\"}"
+      ]
+    },
+    "mutating_tool_call": {
+      "description": "Provider requests a mutating file.write tool — should trigger approval gate.",
+      "response": "{\"intent\": \"tool_call\", \"tool_name\": \"file.write\", \"tool_input\": {\"path\": \"src/auth/login_v2.py\", \"content\": \"def login(): pass\"}}"
+    }
+  },
+  "expected_event_types": {
+    "happy_path": ["agent_started", "assistant_output", "completed"],
+    "with_read_only_tool": ["agent_started", "tool_call", "tool_result", "completed"],
+    "with_mutating_tool_blocked": ["agent_started", "approval_requested"],
+    "provider_failure": ["agent_started", "error"]
+  },
+  "structured_error_shapes": {
+    "provider_unavailable": {
+      "event_type": "error",
+      "payload_keys": ["error_type", "message"]
+    },
+    "approval_blocked": {
+      "event_type": "approval_requested",
+      "payload_keys": ["approval_id", "tool_name", "risk", "fingerprint"]
+    }
+  }
+}
